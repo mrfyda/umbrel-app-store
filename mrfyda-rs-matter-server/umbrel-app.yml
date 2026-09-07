@@ -1,0 +1,43 @@
+manifestVersion: 1.1
+id: mrfyda-rs-matter-server
+category: automation
+name: rs-matter-server
+version: "0.1.0"
+tagline: A Matter controller server in Rust
+icon: https://raw.githubusercontent.com/mrfyda/umbrel-app-store/main/mrfyda-rs-matter-server/icon.svg
+port: 5580
+description: >-
+  A Matter controller server speaking the same WebSocket API as
+  matterjs-server — the API Home Assistant's Matter integration talks to. Drop
+  it in where you would run the Node or Python Matter server.
+
+
+  Built on rs-matter. The point is the resource footprint: 11.4 MiB resident
+  against the reference's 199.6 MiB under the same workload, which matters on
+  a small always-on host running Home Assistant alongside everything else.
+
+
+  Point Home Assistant's Matter integration at ws://<host-address>:5580/ws
+
+
+  ⚠️ Runs as root and mounts the host's D-Bus socket, so that Bluetooth
+  commissioning can reach BlueZ. Both are needed here for the same reasons
+  Home Assistant's app needs them.
+
+
+  ⚠️ Uses host networking and binds port 5580. Stop any other Matter server
+  on this machine first, including one running under Portainer.
+developer: mrfyda
+website: https://github.com/mrfyda/rs-matter-server
+submitter: mrfyda
+submission: https://github.com/mrfyda/rs-matter-server
+repo: https://github.com/mrfyda/rs-matter-server
+support: https://github.com/mrfyda/rs-matter-server/issues
+gallery: []
+releaseNotes: >-
+  Bluetooth commissioning over a local BlueZ adapter, in addition to
+  commissioning devices already on the IP network.
+dependencies: []
+path: "/health"
+defaultUsername: ""
+defaultPassword: ""

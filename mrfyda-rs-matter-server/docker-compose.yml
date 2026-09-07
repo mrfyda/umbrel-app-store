@@ -1,0 +1,41 @@
+version: "3.7"
+
+services:
+  # No app_proxy: this is a WebSocket API for Home Assistant rather than a web
+  # UI, and it needs host networking, which the proxy cannot front. Home
+  # Assistant's own Umbrel app omits it for the same reason.
+  server:
+    image: ghcr.io/mrfyda/rs-matter-server:latest
+    restart: on-failure
+    stop_grace_period: 1m
+
+    # Not optional. Matter reaches devices over IPv6 link-local addresses and
+    # finds them with mDNS multicast, neither of which survives Docker's
+    # bridge NAT.
+    network_mode: host
+
+    volumes:
+      # Fabric, certificates, node list, credentials. Losing this means
+      # re-commissioning every device.
+      - ${APP_DATA_DIR}/data:/data
+      # The host's system bus, for Bluetooth commissioning.
+      #
+      # This is the whole reason the server belongs in the app store rather
+      # than a Portainer stack. Portainer runs its containers in a nested
+      # Docker daemon, which resolves this path inside the DinD container
+      # where no bus exists — Docker then creates an empty directory and the
+      # connect fails with a permission error. Here the path resolves against
+      # the real host, where bluetoothd is running.
+      - /run/dbus:/run/dbus:ro
+
+    # The image runs as uid 65532, which does not work here for two reasons:
+    # Umbrel creates APP_DATA_DIR owned by the host user, and BlueZ's D-Bus
+    # policy commonly restricts org.bluez to root. Home Assistant's Umbrel app
+    # runs privileged as root for the same reasons. If Bluetooth is not needed,
+    # this line can go once the data directory is chowned to 65532.
+    user: "0:0"
+
+    environment:
+      LISTEN_ADDRESS: 0.0.0.0:5580
+      STORAGE_PATH: /data
+      LOG_LEVEL: info
