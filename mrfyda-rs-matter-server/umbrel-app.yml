@@ -2,7 +2,7 @@ manifestVersion: 1.1
 id: mrfyda-rs-matter-server
 category: automation
 name: rs-matter-server
-version: "0.1.0"
+version: "0.1.1"
 tagline: A Matter controller server in Rust
 icon: https://raw.githubusercontent.com/mrfyda/umbrel-app-store/main/mrfyda-rs-matter-server/icon.svg
 port: 5580
@@ -35,8 +35,14 @@ repo: https://github.com/mrfyda/rs-matter-server
 support: https://github.com/mrfyda/rs-matter-server/issues
 gallery: []
 releaseNotes: >-
-  Bluetooth commissioning over a local BlueZ adapter, in addition to
-  commissioning devices already on the IP network.
+  No change to the server itself — upstream v0.1.1 only moved its release
+  workflows onto Node 24 action runtimes.
+
+
+  What changes here is the pin: upstream now publishes versioned releases, so
+  the app tracks ghcr.io/mrfyda/rs-matter-server:0.1.1 by digest instead of
+  following :latest. Updates now arrive when this app store says so rather
+  than whenever the upstream tag moves.
 dependencies: []
 path: "/health"
 defaultUsername: ""

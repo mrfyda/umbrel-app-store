@@ -5,7 +5,10 @@ services:
   # UI, and it needs host networking, which the proxy cannot front. Home
   # Assistant's own Umbrel app omits it for the same reason.
   server:
-    image: ghcr.io/mrfyda/rs-matter-server:latest
+    # Pinned to a released version and its index digest, the way the official
+    # app store pins its images: the tag says which release this is, the digest
+    # makes it the exact one that was tested here.
+    image: ghcr.io/mrfyda/rs-matter-server:0.1.1@sha256:853bb0741d1ace5579f1001d94e8c90be64482501d58594846a0ab0d791c44c9
     restart: on-failure
     stop_grace_period: 1m
 
