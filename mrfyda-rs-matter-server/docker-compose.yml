@@ -8,7 +8,7 @@ services:
     # Pinned to a released version and its index digest, the way the official
     # app store pins its images: the tag says which release this is, the digest
     # makes it the exact one that was tested here.
-    image: ghcr.io/mrfyda/rs-matter-server:0.1.1@sha256:853bb0741d1ace5579f1001d94e8c90be64482501d58594846a0ab0d791c44c9
+    image: ghcr.io/mrfyda/rs-matter-server:0.1.4@sha256:408b759301ee2af5e82ebdb8120ee4503cfaa09c10d67a4dee6b12b7251d7792
     restart: on-failure
     stop_grace_period: 1m
 
@@ -42,3 +42,9 @@ services:
       LISTEN_ADDRESS: 0.0.0.0:5580
       STORAGE_PATH: /data
       LOG_LEVEL: info
+      # The port Matter traffic is answered on and advertised to devices.
+      # 5540 is the image's own default, set here because with host
+      # networking it is a host port and worth seeing in this file: since
+      # 0.1.3 the server binds it for real and refuses to start if something
+      # else holds it, rather than advertising a port it never listened on.
+      MATTER_PORT: "5540"

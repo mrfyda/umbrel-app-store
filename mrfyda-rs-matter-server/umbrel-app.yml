@@ -2,7 +2,7 @@ manifestVersion: 1.1
 id: mrfyda-rs-matter-server
 category: automation
 name: rs-matter-server
-version: "0.1.1"
+version: "0.1.4"
 tagline: A Matter controller server in Rust
 icon: https://raw.githubusercontent.com/mrfyda/umbrel-app-store/main/mrfyda-rs-matter-server/icon.svg
 port: 5580
@@ -17,7 +17,7 @@ description: >-
   a small always-on host running Home Assistant alongside everything else.
 
 
-  Point Home Assistant's Matter integration at ws://<host-address>:5580/ws
+  Point Home Assistant's Matter integration at ws://localhost:5580/ws
 
 
   ⚠️ Runs as root and mounts the host's D-Bus socket, so that Bluetooth
@@ -25,8 +25,10 @@ description: >-
   Home Assistant's app needs them.
 
 
-  ⚠️ Uses host networking and binds port 5580. Stop any other Matter server
-  on this machine first, including one running under Portainer.
+  ⚠️ Uses host networking and binds two host ports: 5580 for the WebSocket
+  API, and 5540 for Matter traffic itself. Stop any other Matter server on
+  this machine first, including one running under Portainer — one still
+  holding 5540 will stop this one from starting.
 developer: mrfyda
 website: https://github.com/mrfyda/rs-matter-server
 submitter: mrfyda
@@ -35,14 +37,28 @@ repo: https://github.com/mrfyda/rs-matter-server
 support: https://github.com/mrfyda/rs-matter-server/issues
 gallery: []
 releaseNotes: >-
-  No change to the server itself — upstream v0.1.1 only moved its release
-  workflows onto Node 24 action runtimes.
+  Three upstream releases at once. The substance is 0.1.3: the server now
+  answers the exchanges a device opens, instead of only driving devices.
+  Nodes are subscribed to rather than polled, a device's events arrive as
+  node_event, check-ins fill in get_icd_state, update_node hosts an OTA
+  Provider cluster, and a camera's WebRTC signalling relays both ways. Real
+  hardware then found four bugs that 324 tests had not — among them that
+  every write omitted the mandatory TimedRequest, so write_attribute,
+  set_acl_entry and set_node_binding had all been refused by the device.
 
 
-  What changes here is the pin: upstream now publishes versioned releases, so
-  the app tracks ghcr.io/mrfyda/rs-matter-server:0.1.1 by digest instead of
-  following :latest. Updates now arrive when this app store says so rather
-  than whenever the upstream tag moves.
+  ⚠️ Read this before updating. That release binds and advertises a real
+  Matter port, 5540, rather than the ephemeral one it never listened on.
+  Under host networking that is a host port. Anything else still holding
+  5540 — matterjs-server, python-matter-server, a Portainer stack — now
+  stops this server from starting, rather than letting it advertise a port
+  it is not listening on. Stop that one first, or set MATTER_PORT in
+  docker-compose.yml.
+
+
+  0.1.2 publishes the image for amd64 as well as arm64, so this app installs
+  on an Intel or AMD Umbrel host for the first time — 0.1.1 was arm64 only.
+  0.1.4 is docs only.
 dependencies: []
 path: "/health"
 defaultUsername: ""
