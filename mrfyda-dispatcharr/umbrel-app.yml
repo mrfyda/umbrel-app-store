@@ -1,0 +1,83 @@
+manifestVersion: 1.1
+id: mrfyda-dispatcharr
+category: media
+name: Dispatcharr
+version: "0.31.0"
+tagline: Manage IPTV streams, EPG data and VOD in one place
+icon: https://raw.githubusercontent.com/mrfyda/umbrel-app-store/main/mrfyda-dispatcharr/icon.png
+port: 9191
+description: >-
+  Import M3U playlists and XMLTV guides, merge and dedupe them into channels you
+  actually want, then hand the result back out as a clean M3U, an EPG, or an
+  HDHomeRun tuner that Plex, Jellyfin and Emby discover on their own. Streams
+  are proxied, so failover between sources is transparent to the player.
+
+
+  This is the all-in-one image: Postgres, Redis, Celery and the web app in a
+  single container, all of it under ${APP_DATA_DIR}.
+
+
+  Sign in with the account you create on first load. There is no default
+  password.
+
+
+  ⚠️ This app sleeps when idle. A Lazytainer sidecar stops the container after
+  5 minutes with no traffic and starts it again on the next connection. The
+  first request after it has slept will fail — umbrelOS shows "Oops, there was
+  an error" — because nothing is listening yet. Wait for the cold start
+  (30-60s on a Raspberry Pi; Postgres has to come up before Django does) and
+  reload. Every request after that is normal speed.
+
+
+  ⚠️ Scheduled work does not run while the app is asleep. Celery is inside the
+  sleeping container, so automatic M3U and EPG refreshes only happen during
+  windows where something is already keeping the app awake. Refresh manually,
+  or raise inactiveTimeout, if you depend on them.
+
+
+  ⚠️ Umbrel's login is disabled for this app. Dispatcharr's own account is the
+  only thing in front of it, because IPTV players, Plex and Jellyfin cannot
+  send an Umbrel session cookie to the M3U, EPG, HDHomeRun and stream URLs.
+
+
+  ⚠️ Mounts the host's Docker socket, which is effectively host root access,
+  so that Lazytainer can start and stop the app container. This is why the app
+  is here and not in the official Umbrel App Store.
+developer: Dispatcharr
+website: https://dispatcharr.github.io/Dispatcharr-Docs/
+submitter: mrfyda
+submission: https://github.com/mrfyda/umbrel-app-store
+repo: https://github.com/Dispatcharr/Dispatcharr
+support: https://github.com/Dispatcharr/Dispatcharr/issues
+gallery: []
+releaseNotes: >-
+  Upstream 0.31.0. The most useful part here is logging: container output is
+  collected into one stream, and System → Logs lists, filters and downloads
+  it from the browser. That matters for this packaging, where the app is a
+  single container and Umbrel gives you no shell to tail it from. Optional
+  on-disk persistence writes to /data/logs, inside the volume this app
+  already keeps.
+
+
+  Also in this release: recordings can transcode through a DVR output
+  profile and use broadcast-date placeholders in path templates, admins can
+  restrict a user's Redirect sources to an allowlist of provider profiles,
+  the TV Guide loads past the old 24-hour cap as you scroll, failed M3U and
+  EPG refreshes raise system events instead of failing silently, and the
+  channel and stream tables go up to 500 rows a page.
+
+
+  Worth knowing on a small host: UWSGI_WORKERS and CELERY_MAX_WORKERS are
+  now tunable, defaulting to 4 and 6. Lowering them in docker-compose.yml
+  trades throughput for memory on a Raspberry Pi.
+
+
+  Security: Django 6.0.7 → 6.0.8, fixing a high-severity server-side
+  file-write and request forgery (CVE-2026-15307) and three lesser issues,
+  with further fixes in djangorestframework, cryptography, pillow and
+  yt-dlp. DVR recording paths are now confined to /data/recordings, and
+  rebuilding stream hashes is admin-only.
+dependencies: []
+path: ""
+defaultUsername: ""
+defaultPassword: ""

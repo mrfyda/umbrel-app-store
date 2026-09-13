@@ -1,0 +1,69 @@
+version: "3.7"
+
+services:
+  app_proxy:
+    environment:
+      # Lazytainer owns the network namespace and is the only always-up
+      # container here, so it is what the gateway resolves and connects to.
+      APP_HOST: mrfyda-karaoke-eternal_lazytainer_1
+      APP_PORT: 8080
+      # The entire point of this app is that guests scan a QR code and open it
+      # on their own phones. They have no Umbrel account, so Umbrel's login in
+      # front of it would lock out everyone but the host. Karaoke Eternal's own
+      # accounts and per-room passwords are the access control.
+      PROXY_AUTH_ADD: "false"
+
+  # ============================================================================
+  # Lazytainer — the always-on gatekeeper
+  # ============================================================================
+  #
+  # ⚠️ Needs the host's Docker socket to start and stop the app container,
+  # which is effectively host root access. That is why this app is in a
+  # personal store rather than the official Umbrel App Store.
+  lazytainer:
+    image: ghcr.io/vmorganp/lazytainer:sha-919abb2@sha256:c6c76d8534e9d74732e415e92401b3ca37a8274dad7b3496993a8f9def074149
+    restart: on-failure
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+    environment:
+      VERBOSE: "false"
+    labels:
+      - "lazytainer.group.karaoke.ports=8080"
+      # A party is exactly when you do not want this guessing wrong. Phones and
+      # the player hold websockets open, and Lazytainer counts ESTABLISHED
+      # sockets as well as packets, so an idle-but-connected room stays up;
+      # 15 minutes covers the gap between the last phone disconnecting and the
+      # next song night.
+      - "lazytainer.group.karaoke.inactiveTimeout=900"
+      - "lazytainer.group.karaoke.minPacketThreshold=1"
+      - "lazytainer.group.karaoke.sleepMethod=stop"
+
+  # ============================================================================
+  # Karaoke Eternal Server
+  # ============================================================================
+  server:
+    image: radrootllc/karaoke-eternal:2.0.2@sha256:96a4ff5f14657aaa0e7308f1455fedab7065756e1e3e163522619ee3aa9f5c5f
+    restart: on-failure
+
+    network_mode: service:lazytainer
+    depends_on:
+      - lazytainer
+
+    labels:
+      - "lazytainer.group=karaoke"
+
+    volumes:
+      # Accounts, rooms, the song database and the session key.
+      - ${APP_DATA_DIR}/data/config:/config
+      # Media library. Add /mnt/karaoke under Media Folders in the app to scan
+      # it. Point this somewhere roomier if the songs outgrow app-data — e.g.
+      # ${UMBREL_ROOT}/home/Karaoke:/mnt/karaoke
+      - ${APP_DATA_DIR}/data/media:/mnt/karaoke
+
+    # LinuxServer-style image: starts as root, fixes ownership, then drops to
+    # PUID:PGID. 1000:1000 is what Umbrel owns APP_DATA_DIR as. Do not add a
+    # `user:` key — it would run before the image can fix permissions.
+    environment:
+      PUID: "1000"
+      PGID: "1000"
+      TZ: ${TZ:-UTC}

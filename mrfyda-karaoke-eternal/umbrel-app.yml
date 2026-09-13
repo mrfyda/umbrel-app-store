@@ -1,0 +1,57 @@
+manifestVersion: 1.1
+id: mrfyda-karaoke-eternal
+category: media
+name: Karaoke Eternal
+version: "2.0.2"
+tagline: Host karaoke parties where everyone queues songs from their phone
+icon: https://raw.githubusercontent.com/mrfyda/umbrel-app-store/main/mrfyda-karaoke-eternal/icon.png
+port: 8090
+description: >-
+  Everyone at the party opens the app on their own phone, searches the library
+  and queues songs. The player is a browser tab too — put it fullscreen on
+  whatever is wired to the TV and speakers. Plays MP3+G, zipped MP3+G and MP4,
+  with music-synced WebGL visualizations behind the lyrics.
+
+
+  Multiple rooms can run at once, each with its own queue and optional
+  password, and guests join by scanning a QR code. No microphones needed: the
+  player only outputs the music.
+
+
+  Create the first admin account when you open the app. Then add /mnt/karaoke
+  under Media Folders and scan.
+
+
+  Songs go in ${APP_DATA_DIR}/data/media on the Umbrel host. Point that mount
+  at a larger folder in docker-compose.yml if the library outgrows app-data.
+
+
+  ⚠️ This app sleeps when idle. A Lazytainer sidecar stops the container after
+  15 minutes with no traffic and starts it again on the next connection. The
+  first request after it has slept will fail — umbrelOS shows "Oops, there was
+  an error" — because nothing is listening yet. Wait a few seconds and reload.
+  Once guests are connected their websockets keep it awake, so it will not
+  sleep mid-party. Open it yourself before people arrive.
+
+
+  ⚠️ Umbrel's login is disabled for this app, because party guests scanning
+  the QR code have no Umbrel account. Karaoke Eternal's own accounts and room
+  passwords are what protect it — anyone on your network can reach the login
+  page.
+
+
+  ⚠️ Mounts the host's Docker socket, which is effectively host root access,
+  so that Lazytainer can start and stop the app container. This is why the app
+  is here and not in the official Umbrel App Store.
+developer: Brandon Jones
+website: https://www.karaoke-eternal.com
+submitter: mrfyda
+submission: https://github.com/mrfyda/umbrel-app-store
+repo: https://github.com/bhj/KaraokeEternal
+support: https://github.com/bhj/KaraokeEternal/issues
+gallery: []
+releaseNotes: ""
+dependencies: []
+path: ""
+defaultUsername: ""
+defaultPassword: ""

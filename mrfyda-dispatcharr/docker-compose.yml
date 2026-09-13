@@ -1,0 +1,96 @@
+version: "3.7"
+
+services:
+  app_proxy:
+    environment:
+      # Point at Lazytainer, not at the app. Lazytainer owns the network
+      # namespace and therefore the address:port the app answers on, and it is
+      # the only container here that is always up, so its container name always
+      # resolves.
+      APP_HOST: mrfyda-dispatcharr_lazytainer_1
+      APP_PORT: 9191
+      # Dispatcharr has its own login, and the things that make it useful are
+      # unauthenticated-by-design endpoints that other software calls: the M3U
+      # and EPG URLs, the HDHomeRun emulation Plex/Jellyfin discover, and the
+      # /proxy stream URLs a player opens. None of those can carry an Umbrel
+      # session cookie, so Umbrel auth in front of them would break every
+      # client. Dispatcharr's own account is what protects the UI.
+      PROXY_AUTH_ADD: "false"
+
+  # ============================================================================
+  # Lazytainer — the always-on gatekeeper
+  # ============================================================================
+  #
+  # It does not proxy anything. It holds a network namespace, counts packets
+  # arriving on port 9191 and counts ESTABLISHED sockets on that port, and calls
+  # the Docker API to stop the app when both stay quiet and start it again when
+  # they don't.
+  #
+  # ⚠️ That Docker API access is the host's real Docker socket, which is
+  # effectively host root. It is why the official Umbrel App Store forbids this
+  # and why this app lives in a personal store instead.
+  lazytainer:
+    image: ghcr.io/vmorganp/lazytainer:sha-919abb2@sha256:c6c76d8534e9d74732e415e92401b3ca37a8274dad7b3496993a8f9def074149
+    restart: on-failure
+    volumes:
+      # Under Portainer this was /data/docker.sock, because Portainer's own
+      # containers run in a nested Docker daemon. Here the app runs in
+      # umbrelOS' main daemon, so it is the ordinary host path.
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+    environment:
+      VERBOSE: "false"
+    labels:
+      # Group name must not contain a dot: Lazytainer parses the group out of
+      # the label as the third dot-separated field.
+      - "lazytainer.group.dispatcharr.ports=9191"
+      # 5 minutes, not the 60s used under Portainer. The app is stopped, not
+      # paused, so waking it means a full cold start — Postgres recovery, then
+      # migrate, collectstatic, uwsgi and nginx. Sleeping aggressively means
+      # paying that repeatedly.
+      - "lazytainer.group.dispatcharr.inactiveTimeout=300"
+      - "lazytainer.group.dispatcharr.minPacketThreshold=1"
+      - "lazytainer.group.dispatcharr.sleepMethod=stop"
+
+  # ============================================================================
+  # Dispatcharr — all-in-one
+  # ============================================================================
+  server:
+    image: ghcr.io/dispatcharr/dispatcharr:0.31.0@sha256:f81924fa3dbfeb463b3908be7e086bf58aacbd2ba56062bfb555ee3a471acf8f
+    restart: on-failure
+
+    # Shares Lazytainer's network namespace, so Lazytainer sees every packet
+    # meant for this container. It has no address of its own and no DNS name,
+    # which is fine: everything it talks to (Postgres, Redis, Celery) is inside
+    # this same image.
+    network_mode: service:lazytainer
+    depends_on:
+      - lazytainer
+
+    labels:
+      - "lazytainer.group=dispatcharr"
+
+    volumes:
+      # Everything: Postgres cluster at /data/db, the generated Django secret
+      # at /data/jwt, logos, recordings, uploads. Losing this is losing the
+      # install.
+      - ${APP_DATA_DIR}/data:/data
+
+    # No `user:` here on purpose. The image starts as root and drops to
+    # PUID:PGID itself — it has to, because it renames the internal account,
+    # chowns the Postgres cluster and rewrites nginx's user directive before
+    # anything starts. Forcing `user: "1000:1000"` makes the init scripts fail.
+    # PUID/PGID default to 1000 anyway, which is what Umbrel owns APP_DATA_DIR
+    # as, but they are set explicitly so it stays true if the default changes.
+    environment:
+      DISPATCHARR_ENV: aio
+      PUID: "1000"
+      PGID: "1000"
+      DISPATCHARR_PORT: "9191"
+      DISPATCHARR_LOG_LEVEL: info
+      TZ: ${TZ:-UTC}
+
+    # The shutdown path stops Postgres, Redis, Celery, uwsgi and nginx in turn
+    # and allows itself 8s before force-killing. Docker's default 10s grace
+    # period leaves no margin, and Lazytainer triggers this every time the app
+    # goes idle rather than only on app updates.
+    stop_grace_period: 1m
