@@ -77,6 +77,17 @@ releaseNotes: >-
   with further fixes in djangorestframework, cryptography, pillow and
   yt-dlp. DVR recording paths are now confined to /data/recordings, and
   rebuilding stream hashes is admin-only.
+
+
+  Packaging fix in this store: Redis now runs as its own container rather than
+  the one bundled in the app image. The bundled binary's jemalloc is built for
+  4 KiB pages and segfaults on a host with larger ones — a Raspberry Pi 5 on
+  Raspberry Pi OS, whose kernel uses 16 KiB pages, is exactly that — which
+  left Celery unable to connect and sign-in returning 500. The official Redis
+  image is built to cover 4, 16 and 64 KiB pages alike, so the app now works
+  on a Pi 5 with nothing to configure. On such a host the bundled Redis still
+  segfaults and is respawned in the log every 20 seconds or so; it is unused
+  and the noise is harmless.
 dependencies: []
 path: ""
 defaultUsername: ""

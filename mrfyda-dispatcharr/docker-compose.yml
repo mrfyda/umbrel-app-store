@@ -52,6 +52,64 @@ services:
       - "lazytainer.group.dispatcharr.sleepMethod=stop"
 
   # ============================================================================
+  # Redis — a sidecar, because the bundled one cannot start everywhere
+  # ============================================================================
+  #
+  # The all-in-one image runs its own redis-server under uwsgi. That binary's
+  # jemalloc is built for 4 KiB pages, so on a host whose pages are larger it
+  # prints "<jemalloc>: Unsupported system page size" and segfaults before it
+  # binds anything. A Raspberry Pi 5 on Raspberry Pi OS is exactly that host —
+  # its rpi-2712 kernel uses 16 KiB pages by default. Nothing then works:
+  # Celery never connects, and signing in returns 500, because the token
+  # endpoint reads the Django cache.
+  #
+  # Upstream's answer is to move the Pi onto the 4 KiB kernel — kernel8.img in
+  # /boot/firmware/config.txt — and they closed the report on that basis:
+  # https://github.com/Dispatcharr/Dispatcharr/issues/620. It does work, but it
+  # is a machine-wide change, and it would leave this app installable only by
+  # someone willing to re-kernel their box first.
+  #
+  # The official Redis image has already solved the same problem: it patches
+  # the bundled jemalloc with --with-lg-page=16 on every non-x86 architecture,
+  # the way Debian builds it, so one binary covers 4, 16 and 64 KiB pages.
+  # Pointing the app at that is a change this store can make once, on behalf of
+  # everyone who installs it. Redis as its own service is upstream's own
+  # modular layout, so this is a supported shape rather than an invention.
+  redis:
+    image: redis:8.10.1@sha256:298e5b3bc566bade82f46ad5511777a4a07a294097ce16ada2f6a42be5239df5
+    restart: on-failure
+    depends_on:
+      - lazytainer
+
+    # Shares Lazytainer's namespace so the app reaches it at a literal address
+    # with no DNS in the way. The app container has no network of its own, so a
+    # service name would have to resolve through whatever resolver that
+    # namespace ends up with; 127.0.0.1 depends on nothing.
+    network_mode: service:lazytainer
+
+    # 6380, not 6379, and that is the point. uwsgi still starts the bundled
+    # redis-server and there is no setting here that stops it, so on a 4 KiB
+    # host it comes up perfectly well and takes 6379. Sitting beside it on
+    # another port means one compose file is right on both kinds of host: the
+    # bundled one is simply left unused wherever it happens to run. On a 16 KiB
+    # host it keeps segfaulting and being respawned every ~20s, which is noise
+    # in the log and nothing more — the app is not talking to it.
+    #
+    # Nothing is persisted. All of this is a Celery queue, a Django cache and a
+    # channels layer, all rebuildable, and writing nothing keeps the container
+    # stateless: no data directory to create, no uid to line up with
+    # APP_DATA_DIR.
+    command: ["redis-server", "--port", "6380", "--timeout", "300", "--save", "", "--appendonly", "no"]
+
+    # Deliberately outside the lazytainer group. It has to be up before the app
+    # wakes, and it costs a few MiB at rest.
+    healthcheck:
+      test: ["CMD", "redis-cli", "-p", "6380", "ping"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  # ============================================================================
   # Dispatcharr — all-in-one
   # ============================================================================
   server:
@@ -60,11 +118,12 @@ services:
 
     # Shares Lazytainer's network namespace, so Lazytainer sees every packet
     # meant for this container. It has no address of its own and no DNS name,
-    # which is fine: everything it talks to (Postgres, Redis, Celery) is inside
-    # this same image.
+    # which is fine: Postgres and Celery are inside this same image, and Redis
+    # is the sidecar above, in this same namespace on 6380.
     network_mode: service:lazytainer
     depends_on:
       - lazytainer
+      - redis
 
     labels:
       - "lazytainer.group=dispatcharr"
@@ -88,6 +147,13 @@ services:
       DISPATCHARR_PORT: "9191"
       DISPATCHARR_LOG_LEVEL: info
       TZ: ${TZ:-UTC}
+      # Every Redis client reads these — Celery's broker, the Django cache, the
+      # channels layer, and the connection pools in core/utils.py — so this is
+      # the whole of pointing the app at the sidecar. uwsgi's own
+      # wait_for_redis.py gate reads them too, so startup waits on the Redis
+      # that works rather than the one that cannot start.
+      REDIS_HOST: 127.0.0.1
+      REDIS_PORT: "6380"
 
     # The shutdown path stops Postgres, Redis, Celery, uwsgi and nginx in turn
     # and allows itself 8s before force-killing. Docker's default 10s grace
