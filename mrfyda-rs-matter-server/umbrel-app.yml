@@ -2,7 +2,7 @@ manifestVersion: 1.1
 id: mrfyda-rs-matter-server
 category: automation
 name: rs-matter-server
-version: "0.1.4"
+version: "0.1.4a"
 tagline: A Matter controller server in Rust
 icon: https://raw.githubusercontent.com/mrfyda/umbrel-app-store/main/mrfyda-rs-matter-server/icon.svg
 port: 5580
@@ -37,6 +37,13 @@ repo: https://github.com/mrfyda/rs-matter-server
 support: https://github.com/mrfyda/rs-matter-server/issues
 gallery: []
 releaseNotes: >-
+  0.1.4a is packaging only: the icon is now drawn the way the official App
+  Store draws its own — square and full-bleed, with the mark inset rather
+  than bleeding to the edge. It previously rounded its own corners, which
+  umbrelOS then rounded again over transparent ones. The server itself is
+  unchanged from 0.1.4.
+
+
   Three upstream releases at once. The substance is 0.1.3: the server now
   answers the exchanges a device opens, instead of only driving devices.
   Nodes are subscribed to rather than polled, a device's events arrive as
