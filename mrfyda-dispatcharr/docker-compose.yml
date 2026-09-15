@@ -39,6 +39,25 @@ services:
       - /var/run/docker.sock:/var/run/docker.sock:ro
     environment:
       VERBOSE: "false"
+      # Lazytainer's ESTABLISHED-socket check is off unless this is set, and the
+      # flag reads backwards. Its README documents IPV4_DISABLED / IPV6_DISABLED
+      # as opt-in switches you set to "true" to turn a family off, but the code
+      # only enables a family when the variable *exists* and is not "true":
+      #
+      #   if existsEnvDisableIpv4 && strings.ToLower(envIpv4) != "true" {
+      #       ipv4Enabled = true
+      #   } else { ipv4Enabled = false }     // <- unset lands here
+      #
+      # So with the variable absent, getActiveClients() inspects no sockets at
+      # all and returns 0 forever, leaving packet counting as the only signal.
+      # Setting it to "false" is what actually turns IPv4 counting on. Verified
+      # against this image: one silent held connection on the watched port
+      # reports "0 active clients" without it and "1 active clients" with it.
+      #
+      # IPv6 stays off. netstat's IPv6 read is fatal on a host without it
+      # (vmorganp/Lazytainer#66), and everything reaches these apps over IPv4
+      # on umbrelOS' bridge network anyway.
+      IPV4_DISABLED: "false"
     labels:
       # Group name must not contain a dot: Lazytainer parses the group out of
       # the label as the third dot-separated field.
@@ -52,7 +71,7 @@ services:
       - "lazytainer.group.dispatcharr.sleepMethod=stop"
 
   # ============================================================================
-  # Redis — a sidecar, because the bundled one cannot start everywhere
+  # Valkey — a sidecar, because the bundled Redis cannot start everywhere
   # ============================================================================
   #
   # The all-in-one image runs its own redis-server under uwsgi. That binary's
@@ -69,14 +88,34 @@ services:
   # is a machine-wide change, and it would leave this app installable only by
   # someone willing to re-kernel their box first.
   #
-  # The official Redis image has already solved the same problem: it patches
-  # the bundled jemalloc with --with-lg-page=16 on every non-x86 architecture,
-  # the way Debian builds it, so one binary covers 4, 16 and 64 KiB pages.
-  # Pointing the app at that is a change this store can make once, on behalf of
-  # everyone who installs it. Redis as its own service is upstream's own
-  # modular layout, so this is a supported shape rather than an invention.
-  redis:
-    image: redis:8.10.1@sha256:298e5b3bc566bade82f46ad5511777a4a07a294097ce16ada2f6a42be5239df5
+  # The fix is to run a server built the way Debian builds jemalloc: with
+  # --with-lg-page=16, so one binary covers 4, 16 and 64 KiB pages alike. Both
+  # the official Redis image and Valkey's do exactly that on every non-x86
+  # architecture. Redis as its own service is upstream's own modular layout, so
+  # this is a supported shape rather than an invention.
+  #
+  # Valkey rather than Redis, because on this host it is the same server for
+  # less. Valkey is the Linux Foundation's fork of Redis 7.2.4 — it still
+  # reports that version over the wire, which is what redis-py, kombu and
+  # channels_redis negotiate against — and its image ships redis-server and
+  # redis-cli as symlinks, so nothing here has to know the difference.
+  # Measured on arm64, the same command line against the same running
+  # Dispatcharr, as anonymous RSS / total container memory / image size:
+  #
+  #   valkey 9.1.2-alpine   3.7 MiB /  5 MiB /  22 MB   no modules
+  #   redis  8.10.1         6.2 MiB / 23 MiB /  55 MB   5 modules
+  #
+  # The container figure is the wider gap because it also counts the module
+  # objects once they are mapped in.
+  #
+  # The gap is mostly modules. The Redis 8 entrypoint appends --loadmodule for
+  # every .so it ships, so this container was loading RediSearch, RedisJSON,
+  # RedisBloom, RedisTimeSeries and VectorSet — about 29 MB of shared objects —
+  # on every wake, for a Celery queue and a Django cache that use none of them.
+  # There is no flag to turn that off; only bypassing the entrypoint or leaving
+  # the image. Valkey ships no modules to begin with.
+  valkey:
+    image: valkey/valkey:9.1.2-alpine@sha256:a0dbf4c1d5708782907c10e2c72deff317518518b5288a58416981d9db95d30b
     restart: on-failure
     depends_on:
       - lazytainer
@@ -99,12 +138,12 @@ services:
     # channels layer, all rebuildable, and writing nothing keeps the container
     # stateless: no data directory to create, no uid to line up with
     # APP_DATA_DIR.
-    command: ["redis-server", "--port", "6380", "--timeout", "300", "--save", "", "--appendonly", "no"]
+    command: ["valkey-server", "--port", "6380", "--timeout", "300", "--save", "", "--appendonly", "no"]
 
     # Deliberately outside the lazytainer group. It has to be up before the app
     # wakes, and it costs a few MiB at rest.
     healthcheck:
-      test: ["CMD", "redis-cli", "-p", "6380", "ping"]
+      test: ["CMD", "valkey-cli", "-p", "6380", "ping"]
       interval: 5s
       timeout: 5s
       retries: 5
@@ -119,11 +158,11 @@ services:
     # Shares Lazytainer's network namespace, so Lazytainer sees every packet
     # meant for this container. It has no address of its own and no DNS name,
     # which is fine: Postgres and Celery are inside this same image, and Redis
-    # is the sidecar above, in this same namespace on 6380.
+    # is the Valkey sidecar above, in this same namespace on 6380.
     network_mode: service:lazytainer
     depends_on:
       - lazytainer
-      - redis
+      - valkey
 
     labels:
       - "lazytainer.group=dispatcharr"
@@ -150,8 +189,8 @@ services:
       # Every Redis client reads these — Celery's broker, the Django cache, the
       # channels layer, and the connection pools in core/utils.py — so this is
       # the whole of pointing the app at the sidecar. uwsgi's own
-      # wait_for_redis.py gate reads them too, so startup waits on the Redis
-      # that works rather than the one that cannot start.
+      # wait_for_redis.py gate reads them too, so startup waits on the sidecar
+      # that works rather than the bundled one that cannot start.
       REDIS_HOST: 127.0.0.1
       REDIS_PORT: "6380"
 

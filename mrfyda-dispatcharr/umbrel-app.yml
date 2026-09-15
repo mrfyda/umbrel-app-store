@@ -2,7 +2,7 @@ manifestVersion: 1.1
 id: mrfyda-dispatcharr
 category: media
 name: Dispatcharr
-version: "0.31.0"
+version: "0.31.0a"
 tagline: Manage IPTV streams, EPG data and VOD in one place
 icon: https://raw.githubusercontent.com/mrfyda/umbrel-app-store/main/mrfyda-dispatcharr/icon.png
 port: 9191
@@ -13,8 +13,10 @@ description: >-
   are proxied, so failover between sources is transparent to the player.
 
 
-  This is the all-in-one image: Postgres, Redis, Celery and the web app in a
-  single container, all of it under ${APP_DATA_DIR}.
+  This is the all-in-one image: Postgres, Celery and the web app in a single
+  container, all of it under ${APP_DATA_DIR}. Its cache and queue live in a
+  small Valkey container alongside, because the Redis bundled in the image
+  cannot start on every host — see the release notes.
 
 
   Sign in with the account you create on first load. There is no default
@@ -51,6 +53,11 @@ repo: https://github.com/Dispatcharr/Dispatcharr
 support: https://github.com/Dispatcharr/Dispatcharr/issues
 gallery: []
 releaseNotes: >-
+  0.31.0a adds no upstream code. The letter marks packaging-only changes
+  made in this store — the Valkey sidecar, the Lazytainer fix and the new
+  icon, all described at the end of these notes. Upstream is still 0.31.0.
+
+
   Upstream 0.31.0. The most useful part here is logging: container output is
   collected into one stream, and System → Logs lists, filters and downloads
   it from the browser. That matters for this packaging, where the app is a
@@ -88,6 +95,31 @@ releaseNotes: >-
   on a Pi 5 with nothing to configure. On such a host the bundled Redis still
   segfaults and is respawned in the log every 20 seconds or so; it is unused
   and the noise is harmless.
+
+
+  That sidecar is now Valkey rather than Redis, which on a small host is the
+  same server for less. Valkey's image applies the identical jemalloc page-size
+  patch, so the Pi 5 fix above is unaffected, and it ships redis-server and
+  redis-cli as symlinks, so nothing in the app can tell the difference. The
+  saving is mostly modules: the Redis 8 entrypoint loads every module it ships
+  — RediSearch, RedisJSON, RedisBloom, RedisTimeSeries and VectorSet, about
+  29 MB of shared objects — on every wake, with no way to turn it off, and
+  Dispatcharr uses none of them. Measured against a running Dispatcharr on
+  arm64, the sidecar went from 23 MiB to 5 MiB of container memory, and the
+  image from 55 MB to 22 MB.
+
+
+  Also fixed: the Lazytainer sidecar was never checking for open connections.
+  Its ipv4/ipv6 toggles only enable a family when the environment variable is
+  present, so leaving them unset — the documented default — silently disabled
+  the check, and only packet counting kept the app awake. Setting
+  IPV4_DISABLED to "false" turns it back on, so an open but idle connection
+  now holds the app up as intended.
+
+
+  The icon is also redrawn the way the official App Store draws its own:
+  square and full-bleed, with the mark inset rather than running to the edge
+  and the background opaque rather than transparent.
 dependencies: []
 path: ""
 defaultUsername: ""
