@@ -26,7 +26,33 @@ services:
     volumes:
       - /var/run/docker.sock:/var/run/docker.sock:ro
     environment:
-      VERBOSE: "false"
+      # On, because "why is this still awake?" is otherwise unanswerable. Every
+      # poll then logs one of two lines, and they mean different things:
+      #
+      #   N active clients                      -> a socket is still open
+      #   N packets received in the last 900s   -> traffic, but nobody attached
+      #
+      # Set it back to "false" once the answer is boring.
+      VERBOSE: "true"
+      # Lazytainer's ESTABLISHED-socket check is off unless this is set, and the
+      # flag reads backwards. Its README documents IPV4_DISABLED / IPV6_DISABLED
+      # as opt-in switches you set to "true" to turn a family off, but the code
+      # only enables a family when the variable *exists* and is not "true":
+      #
+      #   if existsEnvDisableIpv4 && strings.ToLower(envIpv4) != "true" {
+      #       ipv4Enabled = true
+      #   } else { ipv4Enabled = false }     // <- unset lands here
+      #
+      # So with the variable absent, getActiveClients() inspects no sockets at
+      # all and returns 0 forever, leaving packet counting as the only signal.
+      # Setting it to "false" is what actually turns IPv4 counting on. Verified
+      # against this image: one silent held connection on the watched port
+      # reports "0 active clients" without it and "1 active clients" with it.
+      #
+      # IPv6 stays off. netstat's IPv6 read is fatal on a host without it
+      # (vmorganp/Lazytainer#66), and everything reaches these apps over IPv4
+      # on umbrelOS' bridge network anyway.
+      IPV4_DISABLED: "false"
     labels:
       - "lazytainer.group.karaoke.ports=8080"
       # A party is exactly when you do not want this guessing wrong. Phones and
@@ -37,6 +63,20 @@ services:
       - "lazytainer.group.karaoke.inactiveTimeout=900"
       - "lazytainer.group.karaoke.minPacketThreshold=1"
       - "lazytainer.group.karaoke.sleepMethod=stop"
+      # Explicit, because two timings above are derived from it rather than
+      # from inactiveTimeout, and both surprise you:
+      #
+      # Lazytainer keeps a rolling window of inactiveTimeout/pollRate packet
+      # counts. The idle counter only advances once that whole window is quiet,
+      # and only then does it need another inactiveTimeout of quiet to fire. So
+      # after the app has actually been used, sleeping takes up to *twice*
+      # inactiveTimeout — up to 30 minutes here, not 15. From a cold start the
+      # window is already zeroed and 15 minutes is the real figure.
+      #
+      # minPacketThreshold=1 also reads stricter than it looks: the test is
+      # "fewer than 1 packet in the whole window", so a single stray packet in
+      # 15 minutes is enough to keep the app awake.
+      - "lazytainer.group.karaoke.pollRate=30"
 
   # ============================================================================
   # Karaoke Eternal Server
