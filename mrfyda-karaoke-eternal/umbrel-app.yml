@@ -2,7 +2,7 @@ manifestVersion: 1.1
 id: mrfyda-karaoke-eternal
 category: media
 name: Karaoke Eternal
-version: "2.0.2a"
+version: "2.0.2b"
 tagline: Host karaoke parties where everyone queues songs from their phone
 icon: https://raw.githubusercontent.com/mrfyda/umbrel-app-store/main/mrfyda-karaoke-eternal/icon.png
 port: 8090
@@ -60,31 +60,34 @@ repo: https://github.com/bhj/KaraokeEternal
 support: https://github.com/bhj/KaraokeEternal/issues
 gallery: []
 releaseNotes: >-
-  2.0.2a adds no upstream code. The letter marks packaging-only changes
-  made in this store; upstream is still 2.0.2.
+  2.0.2b adds no upstream code. The letter marks packaging-only changes made in
+  this store; upstream is still 2.0.2.
 
 
-  Packaging fix in this store: the Lazytainer sidecar was never checking for
-  open connections. Its ipv4/ipv6 toggles only enable a family when the
-  environment variable is present, so leaving them unset — the documented
-  default — silently disabled the check, and packet counting was the only
-  thing keeping the app awake. That is the wrong failure for this app in
-  particular: a room full of phones sitting quietly between songs could have
-  been stopped underneath the party. Setting IPV4_DISABLED to "false" turns
-  the check back on, so connected guests now hold the app up even when nobody
-  is touching anything.
+  2.0.2a turned Lazytainer's open-connection check back on, and that turns out
+  to have been necessary but not sufficient — the check was running and still
+  seeing nothing. Karaoke Eternal's server binds IPv6 only: Node's listen()
+  with no host argument takes "::", and the app has no setting to change it, so
+  every connection lands in the kernel's IPv6 socket table while Lazytainer,
+  deliberately configured not to read that table, went on reporting "0 active
+  clients". Measured with three browser-equivalent connections held open on
+  port 8080, it saw none of them.
 
 
-  Lazytainer logging is also on now, because "why is this still awake?" was
-  otherwise unanswerable. Its log says either "N active clients" — a browser
-  tab somewhere is still attached — or "N packets received in the last 900
-  seconds", which is traffic without an attached client. Set VERBOSE back to
-  "false" in docker-compose.yml once the answer stops being interesting.
+  So the original risk was still live. A room of phones sitting quietly between
+  songs generates almost no traffic, and with nothing holding the app up but
+  packet counting it could still have been stopped underneath the party.
 
 
-  The icon is also redrawn the way the official App Store draws its own:
-  square and full-bleed, with the mark inset rather than running to the edge
-  and the background opaque rather than transparent.
+  The fix takes IPv6 away from the network namespace the sidecar and the app
+  share. Node tries IPv6 first and falls back to IPv4 when that bind fails, so
+  its sockets move into the table Lazytainer already reads, and connected
+  guests now genuinely hold the app up. Nothing about how you reach the app
+  changes — it was always served over IPv4.
+
+
+  VERBOSE is still on if you want to watch it work: with a single tab open the
+  log should now say "1 active clients" where it used to say 0.
 dependencies: []
 path: ""
 defaultUsername: ""

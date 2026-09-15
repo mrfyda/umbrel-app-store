@@ -49,10 +49,47 @@ services:
       # against this image: one silent held connection on the watched port
       # reports "0 active clients" without it and "1 active clients" with it.
       #
-      # IPv6 stays off. netstat's IPv6 read is fatal on a host without it
-      # (vmorganp/Lazytainer#66), and everything reaches these apps over IPv4
-      # on umbrelOS' bridge network anyway.
+      # IPv6 reading stays off, and on its own that would leave this check
+      # useless here. The sysctl below is what puts the app's sockets in the
+      # table Lazytainer actually reads.
       IPV4_DISABLED: "false"
+
+    # Karaoke Eternal binds IPv6 only, so without this the socket check above
+    # sees nothing at all.
+    #
+    # The server is `server.listen(env.KES_PORT)` with no host argument
+    # (server/serverWorker.ts), and server/lib/cli.ts offers no bind address in
+    # either its env vars or its CLI options, so the app cannot be asked for
+    # IPv4. Node with no host binds `::` dual-stack, which puts the listener
+    # and every IPv4-mapped client connection in /proc/net/tcp6 — and
+    # getActiveClients() reads that table only when ipv6Enabled, which is off.
+    # Measured on 2.0.2 with three connections held open on 8080: zero IPv4
+    # entries, three IPv6 ESTABLISHED, "0 active clients" at every poll, and a
+    # packet counter frozen at 256 throughout. Both stop conditions were
+    # satisfied with three live connections attached, which is the exact
+    # failure IPV4_DISABLED was set to prevent.
+    #
+    # Node tries `::` first and falls back to 0.0.0.0 when that bind fails, so
+    # taking IPv6 out of the namespace is enough to move those sockets into
+    # /proc/net/tcp. Lazytainer owns the namespace, so the sysctl belongs on
+    # this service rather than on the app.
+    #
+    # This rather than IPV6_DISABLED="false", which also works on a host that
+    # has IPv6: that makes netstat read /proc/net/tcp6, which is fatal where
+    # there is none (vmorganp/Lazytainer#66), and a panicking Lazytainer takes
+    # the app down with it because it holds the namespace. The cost of doing it
+    # this way instead is that a kernel with IPv6 compiled out has no
+    # /proc/sys/net/ipv6 for Docker to write, and this container then refuses
+    # to start. That host never had the bug — Node would already have fallen
+    # back to IPv4 by itself — so the trade is a loud failure on a box that did
+    # not need the fix, against a silent one on every box that does.
+    #
+    # Dispatcharr needs none of this: its nginx opens a real 0.0.0.0:9191
+    # socket beside [::]:9191, so its clients land in /proc/net/tcp and the
+    # IPv4-only check there sees them.
+    sysctls:
+      - net.ipv6.conf.all.disable_ipv6=1
+
     labels:
       - "lazytainer.group.karaoke.ports=8080"
       # A party is exactly when you do not want this guessing wrong. Phones and

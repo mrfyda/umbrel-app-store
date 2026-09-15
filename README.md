@@ -63,3 +63,11 @@ as opt-in switches, but its code only enables a family when the variable
 exists and is not `"true"`, so leaving them unset disables the open-connection
 check entirely and leaves packet counting as the only signal. Setting it to
 `"false"` is what turns the check on.
+
+Karaoke Eternal needs one more thing on top of that. Its server binds IPv6
+only — Node's `listen()` with no host argument takes `::`, and the app has no
+setting to change it — so its connections land in a socket table Lazytainer is
+not reading, and the check above sees nothing. Its sidecar therefore also
+disables IPv6 in the network namespace the two share, which makes Node fall
+back to binding IPv4. Dispatcharr needs none of this: its nginx opens a real
+IPv4 socket of its own.
