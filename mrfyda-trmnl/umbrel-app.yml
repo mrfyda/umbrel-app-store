@@ -2,7 +2,7 @@ manifestVersion: 1.1
 id: mrfyda-trmnl
 category: automation
 name: TRMNL
-version: "0.5.0b"
+version: "0.5.0c"
 tagline: Run your own TRMNL server and drive e-ink panels from your own data
 icon: https://raw.githubusercontent.com/mrfyda/umbrel-app-store/main/mrfyda-trmnl/icon.svg
 port: 2300
@@ -73,6 +73,14 @@ repo: https://github.com/gesellix/go-trmnl
 support: https://github.com/gesellix/go-trmnl/issues
 gallery: []
 releaseNotes: >-
+  0.5.0c is a documentation fix. An unset Home Assistant token produces a
+  screenshot of Home Assistant's login page rather than any kind of error: the
+  screenshotter's startup guard only fires when neither HOME_ASSISTANT_URL nor
+  ACCESS_TOKEN is set, and this app always sets the former, so a missing token
+  leaves the container healthy and quietly photographing a login form. The
+  setting now says so, because the symptom does not point at the cause.
+
+
   0.5.0b fixes empty screen previews in the admin UI. The preview is an
   absolute URL built from the server's configured base URL, and that base URL
   was a container name — fine for the Joan bridge, which is a container, and
@@ -161,7 +169,9 @@ environment:
     services: [screenshot]
     note: >-
       Home Assistant long-lived access token, from Profile → Security in Home
-      Assistant. The screenshotter will not start without it.
+      Assistant. Leave it empty and nothing fails loudly — the screenshotter
+      starts, reports healthy, and captures Home Assistant's login page instead
+      of your dashboard. A dithered "Welcome home!" on the panel means this.
   - name: HOME_ASSISTANT_URL
     services: [screenshot]
     default: http://10.21.0.1:8123
