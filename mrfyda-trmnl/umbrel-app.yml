@@ -2,7 +2,7 @@ manifestVersion: 1.1
 id: mrfyda-trmnl
 category: automation
 name: TRMNL
-version: "0.5.0f"
+version: "0.5.0g"
 tagline: Run your own TRMNL server and drive e-ink panels from your own data
 icon: https://raw.githubusercontent.com/mrfyda/umbrel-app-store/main/mrfyda-trmnl/icon.svg
 port: 2300
@@ -73,6 +73,17 @@ repo: https://github.com/gesellix/go-trmnl
 support: https://github.com/gesellix/go-trmnl/issues
 gallery: []
 releaseNotes: >-
+  0.5.0g stops a restart costing five minutes of blank screen. The dashboard
+  sync waits for the screenshotter to have started, which is not the same as
+  waiting for it to listen — Bun and Chromium take a while — so the first cycle
+  after any restart usually failed to connect, and a single sleep for both
+  outcomes then held it there for a whole interval. Failures now back off for
+  15 seconds instead, so a lost startup race costs seconds, and a screen id
+  just written into sync.env takes effect almost at once. The startup banner is
+  gone too: it printed before the config file was read, so it always claimed an
+  empty screen id on the boxes where that file is the only way to set one.
+
+
   0.5.0f fixes the directory 0.5.0e asked you to write into arriving owned by
   root. Updates copy only a whitelist of files and data/ is not on it, so a data
   directory added by a new version never reaches a box that already has the app;

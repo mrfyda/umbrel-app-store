@@ -326,13 +326,18 @@ services:
     entrypoint: ["/bin/sh", "-c"]
     command:
       - |
-        echo "screen-sync: interval $${SYNC_INTERVAL}s, target screen '$$SCREEN_ID'"
         while true; do
           # Sourced per cycle rather than once at start, so editing the file is
-          # enough and the container never needs restarting.
+          # enough and the container never needs restarting. It is also why
+          # there is no banner before this point: at startup SCREEN_ID is still
+          # whatever the environment said, so anything printed up there would
+          # report an empty screen id on exactly the boxes where the file is the
+          # only way to set one.
           [ -f /config/sync.env ] && . /config/sync.env
+
+          ok=false
           if [ -z "$$SCREEN_ID" ]; then
-            echo "screen-sync: SCREEN_ID unset — create a Static Image screen in go-trmnl and set it in the app's settings"
+            echo "screen-sync: SCREEN_ID unset — create a Static Image screen in go-trmnl, then set it in the app's settings or in sync.env"
           elif ! curl -fsS --max-time 180 -o /tmp/screen.png "$$SCREENSHOT_URL"; then
             # Chromium cold-starts on the first capture after a restart, and a
             # Home Assistant dashboard can take a while to settle, hence 180s.
@@ -344,8 +349,26 @@ services:
             # error. A 404 here means SCREEN_ID does not exist; a 401 means the
             # admin password changed.
             echo "screen-sync: upload failed"
+          else
+            ok=true
           fi
-          sleep "$$SYNC_INTERVAL"
+
+          # Back off briefly after a failure instead of waiting out the whole
+          # interval. depends_on only waits for the screenshotter to have
+          # *started*, and it needs Bun and Chromium up before it listens, so
+          # the first cycle after any restart usually loses that race:
+          #
+          #   curl: (7) Failed to connect to mrfyda-trmnl_screenshot_1:10000
+          #
+          # With one sleep for both outcomes that cost a full SYNC_INTERVAL of
+          # blank screen every time the app restarted. It also covers a
+          # SCREEN_ID that has just been written into sync.env, which now takes
+          # effect in seconds rather than up to five minutes.
+          if [ "$$ok" = true ]; then
+            sleep "$$SYNC_INTERVAL"
+          else
+            sleep "$${RETRY_INTERVAL:-15}"
+          fi
         done
 
   # ============================================================================
