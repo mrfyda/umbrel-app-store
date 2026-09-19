@@ -85,7 +85,18 @@ services:
     # apps. Naming an image here would put the unpullable reference straight
     # back into the pull list.
     build:
-      context: ./go-trmnl-image
+      # Absolute, via APP_DATA_DIR, and it has to be. A relative context is
+      # resolved against Compose's project directory, which is the directory of
+      # the *first* --file — and umbrelOS composes an app from several, its own
+      # legacy-compat/docker-compose.app_proxy.yml first and the app's own last:
+      #
+      #   unable to prepare context: path "/opt/umbreld/source/modules/apps/
+      #   legacy-compat/go-trmnl-image" not found
+      #
+      # is what `./go-trmnl-image` gets you. APP_DATA_DIR is where the app
+      # directory was rsynced to at install, which is where this file and that
+      # directory both actually live.
+      context: ${APP_DATA_DIR}/go-trmnl-image
       args:
         # Upstream's git tag, v-prefixed — release *assets* are named after the
         # git tag even though the image tags are not.

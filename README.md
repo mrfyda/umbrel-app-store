@@ -98,8 +98,15 @@ that one service itself, from the *release binary*, which is public on the same
 repository and is what the image is built from anyway. No Go toolchain and no
 source checkout — a download, a checksum, and a copy into the same distroless
 base upstream uses. umbrelOS starts apps with `docker compose up --detach
---build`, and skips build-only services when it pre-pulls images, so this works
-without any special handling.
+--build`, and skips build-only services when it pre-pulls images, so the build
+happens on its own.
+
+The one thing it does need is an **absolute build context**, via
+`${APP_DATA_DIR}`. umbrelOS composes an app from several files — its own
+`legacy-compat/docker-compose.app_proxy.yml` first, the app's own last — and
+Compose resolves relative paths against the directory of the *first* `--file`,
+so a plain `./go-trmnl-image` is looked for next to umbreld's own compose
+fragments and the install fails with `unable to prepare context`.
 
 The download is pinned by the sha256 of the release's `checksums.sha256`,
 recorded in `docker-compose.yml` rather than taken on trust from the file
