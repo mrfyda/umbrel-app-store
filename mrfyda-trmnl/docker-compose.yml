@@ -210,11 +210,33 @@ services:
       # the app's settings if Home Assistant runs on a different machine.
       HOME_ASSISTANT_URL: ${HOME_ASSISTANT_URL:-http://${GATEWAY_IP}:8123}
 
-      # A Home Assistant long-lived access token: Profile → Security →
-      # Long-lived access tokens. Set it in the app's settings rather than here,
-      # so it stays out of this repository. trmnl-ha exits at startup without
-      # it, so the container restarts until it is set.
-      ACCESS_TOKEN: ${ACCESS_TOKEN:-}
+      # ACCESS_TOKEN — a Home Assistant long-lived access token, from Profile →
+      # Security — is deliberately not declared here, and writing
+      # `ACCESS_TOKEN: ${ACCESS_TOKEN:-}` would actively break things.
+      #
+      # trmnl-ha merges its configuration with nullish coalescing:
+      #
+      #   access_token: process.env['ACCESS_TOKEN'] ?? fileOptions.access_token
+      #
+      # An empty string is not nullish, so a declaration that defaults to empty
+      # does not fall through to the file — it wins, as the empty value, and the
+      # file is ignored. Leaving the variable genuinely absent is what lets both
+      # ways of setting it work:
+      #
+      #   umbrelOS 2.0+  the app's settings, which umbreld injects into this
+      #                  service through a compose override
+      #   umbrelOS 1.x   ${APP_DATA_DIR}/data/screenshot/options.json, which
+      #                  lands at /data/options.json inside the container:
+      #                  {"access_token": "..."}
+      #
+      # Per-app settings only exist from umbrelOS 2.0, so on 1.x the file is the
+      # only route — and it is the better one for a secret regardless, living in
+      # app data that an app update never rewrites.
+      #
+      # The file must be valid JSON; a malformed one is a startup FATAL. It does
+      # not switch the app into Home Assistant add-on mode, because that needs
+      # SUPERVISOR_TOKEN or an options file with no environment configuration at
+      # all, and HOME_ASSISTANT_URL above is always set.
 
       # Chromium is restarted between captures rather than held open. It is the
       # largest thing in this app by far, and the point of the go-trmnl swap was

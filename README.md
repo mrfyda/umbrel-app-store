@@ -161,5 +161,16 @@ variable called `ACCESS_TOKEN`, holding different secrets: the Home Assistant
 token and the Joan panel's device token. Only one can be declared, so the Joan
 one goes under Settings → Advanced, which is keyed by service *and* name.
 
+**Its settings need umbrelOS 2.0.** Per-app settings landed on 2026-09-02 and
+are in the 2.0 betas but not in 1.7.4, so on 1.x the app's declared settings are
+ignored and there is no field to type a Home Assistant token into. The
+screenshotter will read its configuration from
+`APP_DATA_DIR/data/screenshot/options.json` instead — and that is the better
+place for a secret on any version, since app updates rewrite
+`docker-compose.yml` but never touch app data. This is why the app does not
+declare `ACCESS_TOKEN` in its compose file at all: trmnl-ha merges environment
+and file config with `??`, and an empty string is not nullish, so a variable
+declared with an empty default would silently win over the file.
+
 It is also **arm64 only**, because the screenshotter is published as separate
 per-architecture images rather than one multi-arch manifest.

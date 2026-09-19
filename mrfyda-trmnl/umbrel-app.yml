@@ -2,7 +2,7 @@ manifestVersion: 1.1
 id: mrfyda-trmnl
 category: automation
 name: TRMNL
-version: "0.5.0c"
+version: "0.5.0d"
 tagline: Run your own TRMNL server and drive e-ink panels from your own data
 icon: https://raw.githubusercontent.com/mrfyda/umbrel-app-store/main/mrfyda-trmnl/icon.svg
 port: 2300
@@ -73,6 +73,18 @@ repo: https://github.com/gesellix/go-trmnl
 support: https://github.com/gesellix/go-trmnl/issues
 gallery: []
 releaseNotes: >-
+  0.5.0d makes the Home Assistant token settable on umbrelOS 1.x. Per-app
+  settings arrived in 2.0, so on 1.x this app's declared settings are ignored
+  entirely and there is no field to type a token into. The screenshotter will
+  also read its configuration from a file, but only if the environment variable
+  is genuinely absent — it merges the two with ?? and an empty string is not
+  nullish, so declaring the variable with an empty default silently beat the
+  file. The declaration is gone, so on 1.x the token can go in
+  APP_DATA_DIR/data/screenshot/options.json, and on 2.0 the settings UI still
+  works. The file is the better place for a secret either way: app updates
+  rewrite docker-compose.yml but never touch app data.
+
+
   0.5.0c is a documentation fix. An unset Home Assistant token produces a
   screenshot of Home Assistant's login page rather than any kind of error: the
   screenshotter's startup guard only fires when neither HOME_ASSISTANT_URL nor
@@ -168,10 +180,12 @@ environment:
   - name: ACCESS_TOKEN
     services: [screenshot]
     note: >-
-      Home Assistant long-lived access token, from Profile → Security in Home
-      Assistant. Leave it empty and nothing fails loudly — the screenshotter
-      starts, reports healthy, and captures Home Assistant's login page instead
-      of your dashboard. A dithered "Welcome home!" on the panel means this.
+      Home Assistant long-lived access token, from Profile → Security. Needs
+      umbrelOS 2.0 or later — these settings do not exist on 1.x, where the
+      token goes in APP_DATA_DIR/data/screenshot/options.json as
+      {"access_token": "..."} instead. Unset either way, the screenshotter still
+      starts and reports healthy but captures Home Assistant's login page: a
+      dithered "Welcome home!" on the panel means this and nothing else.
   - name: HOME_ASSISTANT_URL
     services: [screenshot]
     default: http://10.21.0.1:8123
