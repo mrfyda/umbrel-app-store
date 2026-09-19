@@ -20,6 +20,11 @@ repository's URL.
 - **Karaoke Eternal** — karaoke parties where guests queue songs from their
   own phones. Sleeps when idle.
   ([source](https://github.com/bhj/KaraokeEternal))
+- **TRMNL** — a self-hosted BYOS for TRMNL e-ink displays, plus a Home
+  Assistant dashboard screenshotter and a bridge that drives a Visionect
+  Joan 6 panel. go-trmnl rather than Terminus, so the server is one static
+  binary over SQLite instead of Ruby, Postgres, Sidekiq and Valkey.
+  ([source](https://github.com/gesellix/go-trmnl))
 
 ## Versioning
 
@@ -71,3 +76,71 @@ not reading, and the check above sees nothing. Its sidecar therefore also
 disables IPv6 in the network namespace the two share, which makes Node fall
 back to binding IPv4. Dispatcharr needs none of this: its nginx opens a real
 IPv4 socket of its own.
+
+## A note on the TRMNL app
+
+That app is three former Portainer stacks in one, and it swaps the server out
+from under them. Terminus, TRMNL's reference BYOS, is five containers — a
+Hanami web app, a Sidekiq worker, Postgres, Valkey and a certificate installer.
+[go-trmnl](https://github.com/gesellix/go-trmnl) speaks the same device
+protocol as a single static Go binary over SQLite, so seven containers become
+four. Four things about that are worth knowing before you install it.
+
+**Its server image is built on the host, temporarily.** Published and publicly
+pullable are two different things on GHCR: go-trmnl's release workflow builds a
+multi-arch image and the push succeeds, but package *visibility* is a separate
+setting that defaults to private and no workflow changes it, so anonymous pulls
+are refused — `ghcr.io/gesellix/go-trmnl` issues no anonymous pull token at all,
+where every other image in this store does. umbrelOS pulls anonymously.
+
+Upstream has been asked to make the package public. Until then the app builds
+that one service itself, from the *release binary*, which is public on the same
+repository and is what the image is built from anyway. No Go toolchain and no
+source checkout — a download, a checksum, and a copy into the same distroless
+base upstream uses. umbrelOS starts apps with `docker compose up --detach
+--build`, and skips build-only services when it pre-pulls images, so this works
+without any special handling.
+
+The download is pinned by the sha256 of the release's `checksums.sha256`,
+recorded in `docker-compose.yml` rather than taken on trust from the file
+itself — a checksum file sitting next to the binary it describes proves nothing
+on its own. Both that hash and the version live in `docker-compose.yml` because
+umbrelOS copies the whole app directory on install but only a whitelist on
+update, and the compose file is on that whitelist while `go-trmnl-image` is not.
+
+Undoing it is one line: put the image reference back on the `server` service —
+it is kept in a comment there, digest and all — and delete `go-trmnl-image`.
+Note the image tag is `0.5.0`, not `v0.5.0`; the git tag carries the `v` and
+`docker/metadata-action`'s `{{version}}` pattern strips it. Release *assets*,
+which the temporary build downloads, do use the `v`.
+
+**A sync container exists because go-trmnl has no way in.** Terminus accepts
+screens from outside over `POST /api/screens`, which is how the Home Assistant
+screenshotter fed it. go-trmnl has no such endpoint — no webhook, and a
+static-image plugin that deliberately takes a filename inside its own assets
+directory rather than a URL. The gap is closed by pulling a screenshot and
+posting it to the admin UI's upload form on a timer. That works for a precise
+reason: the plugin declares a 24-hour cache TTL, so overwriting the file on
+disk would keep serving yesterday's render, and it is the upload handler's
+rewrite of the screen's settings — which nulls `rendered_hash` — that actually
+invalidates the cache. It is an HTML form, not an API, so a go-trmnl upgrade
+could break it. A dashboard that stops updating is the symptom.
+
+**No LAN addresses are hardcoded**, which all three Portainer stacks needed.
+The containers address each other over Umbrel's app network by name. Home
+Assistant is the exception that proves it: its Umbrel app runs
+`network_mode: host`, so it has no container name to resolve and never did —
+it is reached at `$GATEWAY_IP`, the app network's gateway, which is the host
+seen from inside. ZeroTier's official app addresses its own host-networked
+service the same way. Nothing breaks when the box changes IP.
+
+**One secret cannot go in the app's normal settings.** umbreld keys
+manifest-declared environment variables by name alone, globally across the app
+— `#resolveEnvironmentVariables()` dedupes into a flat set of names before it
+ever looks at which services a name targets. Two services here genuinely read a
+variable called `ACCESS_TOKEN`, holding different secrets: the Home Assistant
+token and the Joan panel's device token. Only one can be declared, so the Joan
+one goes under Settings → Advanced, which is keyed by service *and* name.
+
+It is also **arm64 only**, because the screenshotter is published as separate
+per-architecture images rather than one multi-arch manifest.

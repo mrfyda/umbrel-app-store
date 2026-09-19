@@ -1,0 +1,50 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="512" height="512" role="img" aria-label="TRMNL">
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#1B1D2A"/>
+      <stop offset="1" stop-color="#0E0F17"/>
+    </linearGradient>
+    <linearGradient id="panel" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#FFFFFF"/>
+      <stop offset="1" stop-color="#D8D9DD"/>
+    </linearGradient>
+
+    <!-- The 2x2 checker an e-ink panel dithers a midtone into. At this size it
+         reads as grey while staying literally one-bit, which is the whole
+         constraint the device works under. -->
+    <pattern id="dither" width="8" height="8" patternUnits="userSpaceOnUse">
+      <rect width="8" height="8" fill="#FFFFFF"/>
+      <rect width="4" height="4" fill="#1B1D2A"/>
+      <rect x="4" y="4" width="4" height="4" fill="#1B1D2A"/>
+    </pattern>
+  </defs>
+
+  <!-- Full-bleed and square, the way the official store's icons are drawn.
+       umbrelOS masks the corners itself, so rounding them here would round
+       twice and leave transparent corners behind the mask. -->
+  <rect width="512" height="512" fill="url(#bg)"/>
+
+  <!-- The panel, at the device's own 800x480 aspect ratio rather than a
+       convenient one, inset so the mark does not run to the edge. -->
+  <g transform="translate(76 110)">
+    <rect width="360" height="216" rx="14" fill="url(#panel)"/>
+
+    <!-- A screen mid-render: a heading, a dithered block standing in for an
+         image, and a couple of rows of text. -->
+    <rect x="26" y="28" width="150" height="20" rx="6" fill="#1B1D2A"/>
+    <rect x="26" y="70" width="128" height="118" rx="8" fill="url(#dither)"/>
+    <g fill="#1B1D2A" opacity="0.82">
+      <rect x="174" y="70" width="160" height="13" rx="6"/>
+      <rect x="174" y="98" width="132" height="13" rx="6"/>
+      <rect x="174" y="126" width="160" height="13" rx="6"/>
+      <rect x="174" y="154" width="104" height="13" rx="6"/>
+    </g>
+  </g>
+
+  <!-- The panel is battery-powered and asleep almost all of the time: it wakes,
+       polls once, redraws and sleeps again. -->
+  <g transform="translate(76 366)">
+    <rect width="332" height="30" rx="15" fill="#FFFFFF" opacity="0.10"/>
+    <rect x="6" y="6" width="150" height="18" rx="9" fill="#5BD6A0"/>
+  </g>
+</svg>

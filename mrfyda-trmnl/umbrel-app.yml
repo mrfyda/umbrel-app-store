@@ -1,0 +1,183 @@
+manifestVersion: 1.1
+id: mrfyda-trmnl
+category: automation
+name: TRMNL
+version: "0.5.0"
+tagline: Run your own TRMNL server and drive e-ink panels from your own data
+icon: https://raw.githubusercontent.com/mrfyda/umbrel-app-store/main/mrfyda-trmnl/icon.svg
+port: 2300
+description: >-
+  A self-hosted BYOS — Build Your Own Server — for TRMNL e-ink displays. Panels
+  wake from deep sleep, ask this server what to show, render the 800x480 image
+  it returns and sleep again, all on your own network. TRMNL's hosted backend is
+  never involved and your calendars never leave the house.
+
+
+  Build screens from the built-in plugins — clock, weather, a family calendar
+  merged from Google and Apple/CalDAV accounts, a quote, days left in the year,
+  a static image — arrange them into a playlist, and assign the playlist to a
+  device. Everything is managed from the admin UI: devices and their telemetry,
+  live screen previews, calendar accounts and logs.
+
+
+  This app also bundles two pieces that turn it into a complete setup rather
+  than just a server:
+
+
+  • A Home Assistant screenshotter, which photographs a dashboard in a headless
+  Chromium, dithers it for e-paper and pushes it in as a screen. This is how you
+  get your own Home Assistant dashboard onto a panel.
+
+
+  • A Joan 6 bridge, which drives a Visionect Joan 6 panel — a 13" 1024x758
+  grayscale display with no TRMNL firmware — by reimplementing its PV3 wire
+  protocol. Point the Joan Configurator app at this Umbrel's address on port
+  11112. Battery and signal strength come back as normal device telemetry.
+
+
+  Sign in to the admin UI as "admin" with this app's password, shown under Show
+  password. Then add each device's MAC address under Devices — registration is
+  trust-based and unknown devices are refused, so nothing is provisioned until
+  you list it.
+
+
+  Setup order matters, and three settings cannot be filled in until the app is
+  running. Add the panel's MAC under Devices, copy the access token go-trmnl
+  issues for it into the Joan bridge, create a Static Image screen and copy its
+  id into the screenshot sync. Until then those two containers restart and the
+  dashboard stays empty; the rest of the app works.
+
+
+  ⚠️ Umbrel's login is disabled for this app. TRMNL's device protocol is a MAC
+  address and an access token in HTTP headers — a sleeping e-ink panel has no
+  way to carry an Umbrel session cookie — so Umbrel auth in front of it would
+  lock out the devices it exists to serve. The admin UI has its own password.
+  The device API and the rendered images are unauthenticated by design.
+
+
+  ⚠️ The screenshotter's web UI, on port 10000, has no authentication at all,
+  and this app puts it on your LAN because it is where capture settings are
+  configured. Upstream ships it as a Home Assistant add-on behind ingress and
+  says never to expose the port; there is no ingress here. Keep it off the
+  internet.
+
+
+  ⚠️ arm64 only. The screenshotter is published as separate per-architecture
+  images rather than one multi-arch manifest, so this app will not install on an
+  Intel or AMD Umbrel host without editing docker-compose.yml.
+developer: Tobias Gesellchen
+website: https://gesellix.github.io/go-trmnl/
+submitter: mrfyda
+submission: https://github.com/mrfyda/umbrel-app-store
+repo: https://github.com/gesellix/go-trmnl
+support: https://github.com/gesellix/go-trmnl/issues
+gallery: []
+releaseNotes: >-
+  First release. This app replaces three Portainer stacks — a Terminus server, a
+  Home Assistant screenshotter and a Joan 6 bridge — with one Umbrel app, and
+  swaps the server underneath them.
+
+
+  Terminus is TRMNL's reference BYOS and runs as five containers: a Hanami web
+  app, a Sidekiq worker, Postgres, Valkey and a one-shot certificate installer.
+  go-trmnl speaks the same device protocol as a single static Go binary over
+  SQLite, with screens drawn in-process rather than by a headless browser. Seven
+  containers become four, and the two datastores and the background worker go
+  away entirely.
+
+
+  Two things are lost with Terminus, and both are deliberate rather than
+  missing. TRMNL's official and community plugins are Liquid templates rendered
+  against a HTML/CSS framework by a browser; go-trmnl's pure-Go pipeline cannot
+  run them, and says so in its own roadmap. You get its six native screens
+  instead. Terminus also accepts screens from outside over POST /api/screens,
+  which is what the Home Assistant screenshotter used, and go-trmnl has no such
+  endpoint — no webhook, and a static-image plugin that deliberately reads only
+  a filename inside its own assets directory.
+
+
+  A small sync container closes that gap: it pulls a fresh screenshot and posts
+  it to the admin UI's upload form on a timer. That path works for a specific
+  reason worth writing down. The static-image plugin declares a 24-hour cache
+  TTL, so a screen whose file was simply overwritten on disk would keep serving
+  yesterday's render. The upload handler rewrites the screen's settings, and
+  that write nulls rendered_hash, which is what actually invalidates the cache.
+  It is an HTML form rather than an API, so a go-trmnl upgrade could change it;
+  a dashboard that stops updating is the symptom.
+
+
+  No LAN addresses are hardcoded anywhere, which the Portainer stacks all needed.
+  The four containers address each other over Umbrel's app network by name, and
+  Home Assistant — whose Umbrel app runs with host networking and so has no name
+  to resolve — is reached at the app network's gateway instead. Nothing breaks
+  when the box changes IP.
+
+
+  One service is built during installation rather than pulled, which is
+  temporary and worth knowing about because it makes the first start slower.
+  go-trmnl's container image is published to GHCR but not publicly pullable —
+  the release build pushes a multi-arch manifest and succeeds, but package
+  visibility is a separate setting that defaults to private, and umbrelOS pulls
+  anonymously. Upstream has been asked to make it public. Until then the app
+  builds that image itself from go-trmnl's release binary, which is public on
+  the same repository and is what the image is built from anyway: a download
+  verified against a pinned checksum, copied into the same distroless base
+  upstream uses. Nothing is compiled. When the package goes public this reverts
+  to an ordinary pinned image reference.
+dependencies: []
+path: "/admin"
+defaultUsername: "admin"
+defaultPassword: ""
+# Without this, "Show password" would show the empty defaultPassword above:
+# umbreld only substitutes the real value when a manifest asks for it, in
+# routes.ts — `if (deterministicPassword) defaultPassword = await
+# app.deriveDeterministicPassword()`. That derivation is the same HMAC over the
+# same identifier that produces ${APP_PASSWORD} in docker-compose.yml, so what
+# the UI shows is what go-trmnl's admin login actually accepts.
+deterministicPassword: true
+environment:
+  - name: ACCESS_TOKEN
+    services: [screenshot]
+    note: >-
+      Home Assistant long-lived access token, from Profile → Security in Home
+      Assistant. The screenshotter will not start without it.
+  - name: HOME_ASSISTANT_URL
+    services: [screenshot]
+    default: http://10.21.0.1:8123
+    note: >-
+      Leave empty unless Home Assistant runs on another machine. The default
+      reaches a host-networked Home Assistant on this Umbrel through the app
+      network's gateway, and survives the box changing its LAN address.
+  - name: DEVICE_ID
+    services: [joan]
+    default: AA:BB:CC:DD:EE:FF
+    note: >-
+      The Joan panel's MAC address, uppercase — a lowercase one is rejected as
+      an invalid device ID. Add the same address under Devices in the admin UI.
+  - name: SCREEN_ID
+    services: [screen-sync]
+    note: >-
+      The screen the Home Assistant dashboard is pushed into. Create a Static
+      Image screen in the admin UI and take the number from its URL. Empty
+      leaves the dashboard sync idle.
+  - name: SCREENSHOT_URL
+    services: [screen-sync]
+    default: http://mrfyda-trmnl_screenshot_1:10000/lovelace/0?viewport=800x480&dithering&dither_method=floyd-steinberg&palette=bw
+    note: >-
+      Which dashboard to capture and how. Compose it in the screenshotter's UI,
+      which shows a Fetch URL with a Copy button, then replace the host part
+      with mrfyda-trmnl_screenshot_1:10000.
+  - name: SYNC_INTERVAL
+    services: [screen-sync]
+    default: "300"
+    options: ["60", "300", "900", "1800"]
+    note: >-
+      Seconds between dashboard captures. This only bounds how stale the newest
+      image can be; how often a panel wakes is its own refresh rate.
+  - name: TRMNL_BASE_URL
+    services: [server]
+    default: http://mrfyda-trmnl_server_1:8080
+    note: >-
+      The address devices fetch images from. The default works for the bundled
+      Joan bridge. A real TRMNL panel on the LAN needs a LAN address instead,
+      e.g. http://192.168.1.10:2300, which keeps working for the bridge too.

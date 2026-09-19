@@ -1,0 +1,335 @@
+version: "3.7"
+
+# ==============================================================================
+# One app out of three Portainer stacks
+# ==============================================================================
+#
+# This replaces a Terminus stack (init-certificates, web, worker, database,
+# keyvalue), a trmnl-ha stack and a trmnl-joan-bridge stack — seven containers
+# — with four, because the server changed.
+#
+# Terminus is TRMNL's reference BYOS: a Hanami app, a Sidekiq worker, Postgres
+# and Valkey, plus a one-shot container to install CA certificates. go-trmnl is
+# the same protocol as a single static Go binary over SQLite, so the whole
+# middle of that stack disappears. What it costs is written up in the service
+# comments below, and the shape of the pipeline is unchanged:
+#
+#   Home Assistant ──▶ screenshot ──▶ screen-sync ──▶ server ──▶ joan ──▶ panel
+#     (host network)   (Chromium)      (this file)  (go-trmnl)  (PV3)
+#
+# Only two of those hops leave this app: Home Assistant, and the Joan panel
+# itself. Everything in between talks over Umbrel's app network by container
+# name, so no LAN address is baked into this file.
+
+services:
+  app_proxy:
+    environment:
+      # go-trmnl serves the admin UI and the device API on one port, so this is
+      # the whole app as far as the gateway is concerned.
+      APP_HOST: mrfyda-trmnl_server_1
+      APP_PORT: 8080
+      # The device API cannot carry an Umbrel session cookie — that is the
+      # whole point of it, a deep-sleeping e-ink panel with an Access-Token
+      # header and nothing else. Umbrel auth in front of this would break any
+      # real TRMNL device pointed at the app, the same reason Dispatcharr turns
+      # it off here. go-trmnl's own HTTP Basic auth protects /admin; TRMNL's
+      # BYOS contract leaves /api/* and /uploads open by design.
+      PROXY_AUTH_ADD: "false"
+
+  # ============================================================================
+  # go-trmnl — the BYOS server
+  # ============================================================================
+  #
+  # Replaces five Terminus containers. A single static binary on distroless,
+  # SQLite instead of Postgres, no background worker, no Redis, no CA-certificate
+  # init step, and screens drawn in-process with fogleman/gg rather than by a
+  # headless browser. On a Raspberry Pi that is the difference between a Ruby
+  # web process, a Sidekiq process and two datastores, and one binary.
+  #
+  # Two things are genuinely lost, and neither is a bug:
+  #
+  #   - TRMNL's plugin ecosystem. Official and community plugins are Liquid
+  #     templates against TRMNL's HTML/CSS framework, rendered by a browser.
+  #     go-trmnl's pure-Go pipeline cannot run them, and its ROADMAP.md says so
+  #     outright. What you get instead is six native screens: clock, weather,
+  #     family calendar (Google + CalDAV), quote, days-left-in-year and static
+  #     image.
+  #   - Any way to accept a screen from outside. Terminus has POST /api/screens;
+  #     go-trmnl's entire route surface is the device API plus an /admin HTML
+  #     UI. That is what the screen-sync service below exists to work around.
+  server:
+    # ⚠️ TEMPORARY. Every other service here names a published image; this one
+    # is built on the host from go-trmnl's public release binary, because its
+    # container image is published but not publicly pullable. Those are two
+    # different things on GHCR: the push succeeds and the manifest is there,
+    # but package visibility defaults to private and no workflow changes it, so
+    # ghcr.io/gesellix/go-trmnl issues no anonymous pull token at all — where
+    # every other image in this file does — and umbrelOS pulls anonymously.
+    # Upstream has been asked to make it public.
+    #
+    # When that happens, this whole block becomes one line again, and the
+    # go-trmnl-image directory can be deleted:
+    #
+    #   image: ghcr.io/gesellix/go-trmnl:0.5.0@sha256:21711d3e5737504ed2286524569970e62243481e590d832c6bf96012e6751c9a
+    #
+    # That is the index digest all three of 0.5.0, 0.5 and latest were pushed
+    # as, kept here so the switch back needs no lookup. Note the tag has no v:
+    # the git tag does, but docker/metadata-action's {{version}} pattern strips
+    # it, so v0.5.0 would 404.
+    #
+    # `image:` is deliberately absent rather than set alongside `build:`.
+    # umbreld collects images to pre-pull with
+    # `Object.values(compose.services).map(s => s.image).filter(Boolean)`, so a
+    # service with only a build context is skipped by the pull and then built
+    # by `docker compose up --detach --build`, which is how umbrelOS starts
+    # apps. Naming an image here would put the unpullable reference straight
+    # back into the pull list.
+    build:
+      context: ./go-trmnl-image
+      args:
+        # Upstream's git tag, v-prefixed — release *assets* are named after the
+        # git tag even though the image tags are not.
+        VERSION: v0.5.0
+        # sha256 of that release's checksums.sha256, pinned here out of band so
+        # the checksum file cannot vouch for itself. See the Dockerfile.
+        CHECKSUMS_SHA256: fd26219cc78bee0f7f6b1078d06a557f5cc83a5a280c35a1003df6ee35af25af
+    # Both args live here rather than in the Dockerfile on purpose: umbrelOS
+    # copies the whole app directory on install but only a whitelist on update,
+    # and docker-compose.yml is on that whitelist while go-trmnl-image is not.
+    # A version bumped in the Dockerfile would reach fresh installs and silently
+    # skip everyone updating.
+    restart: on-failure
+
+    # The image is gcr.io/distroless/static-debian12:nonroot, which runs as uid
+    # 65532 and pre-creates /data owned by it. Umbrel creates APP_DATA_DIR owned
+    # by 1000:1000, so the bind mount below arrives owned by 1000 and the
+    # container cannot write its SQLite database. Unlike the LinuxServer-style
+    # images elsewhere in this store there is no root entrypoint to fix
+    # ownership — distroless has no shell at all — so the uid is set here
+    # instead. A static Go binary does not care which uid it runs as.
+    user: "1000:1000"
+
+    volumes:
+      # SQLite database, uploaded assets, rendered screens and secret.key, which
+      # encrypts stored calendar credentials at rest. Losing secret.key means
+      # re-entering every calendar account, so this directory is the backup.
+      - ${APP_DATA_DIR}/data/server:/data
+
+    environment:
+      TRMNL_DATA_DIR: /data
+      TZ: ${TZ:-UTC}
+
+      # The base every image_url is built from, and therefore an address the
+      # *device* has to be able to reach — go-trmnl will not start without an
+      # absolute URL here.
+      #
+      # The only device here is the joan service below, which shares this app
+      # network, so a container name is enough and nothing depends on the LAN.
+      # Point a real TRMNL panel at this app and that stops being true: set
+      # TRMNL_BASE_URL to http://<umbrel-lan-ip>:2300 in the app's settings,
+      # which keeps working for the bridge too.
+      TRMNL_BASE_URL: ${TRMNL_BASE_URL:-http://mrfyda-trmnl_server_1:8080}
+
+      # HTTP Basic auth on /admin. APP_PASSWORD is Umbrel's per-app derived
+      # secret, so this is stable across restarts without being stored here;
+      # it is shown in the app's "Show password" dialog. Leaving the password
+      # empty would disable admin auth entirely, which matters because port
+      # 2300 is reachable from the LAN unauthenticated by design (see
+      # PROXY_AUTH_ADD above).
+      TRMNL_ADMIN_USER: admin
+      TRMNL_ADMIN_PASSWORD: ${APP_PASSWORD}
+
+      # Hourly sweep of the rendered-image cache and of unreferenced uploads.
+      # Left at the default deliberately: screen-sync writes a new asset file on
+      # every push and never deletes the old one, so this sweep is what stops
+      # the assets directory growing without bound.
+      TRMNL_CLEANUP_INTERVAL: 1h
+
+    # No healthcheck. Distroless ships no shell and no curl, so there is nothing
+    # in the image to run one with, and the binary has no self-check subcommand.
+    # The services that depend on it retry on their own instead.
+
+  # ============================================================================
+  # trmnl-ha — Chromium, pointed at a Home Assistant dashboard
+  # ============================================================================
+  #
+  # Screenshots a dashboard and dithers it for e-ink. Nothing in go-trmnl does
+  # this — it draws its own screens and has no browser — so this stays exactly
+  # as it ran under Portainer.
+  screenshot:
+    # ⚠️ arm64 only. Upstream publishes per-architecture images rather than one
+    # multi-arch manifest, so this tag is literally the aarch64 build and this
+    # app will not install on an Intel or AMD Umbrel host. Swap the two
+    # occurrences of aarch64 for amd64 there.
+    image: ghcr.io/usetrmnl/trmnl-ha-aarch64:0.10.3@sha256:b919250752c4d774137fc40eadd8424e5c521bd805cb14312490b8c0378a8829
+    restart: on-failure
+
+    ports:
+      # ⚠️ Its web UI has no authentication of any kind, and this line puts it
+      # on the LAN. Upstream's own README says to use Home Assistant ingress
+      # and never expose this port; there is no ingress here, and the UI is
+      # where schedules, viewport and dithering are configured, so it is
+      # exposed and this is the warning. Do not forward it beyond the LAN.
+      - "10000:10000"
+
+    volumes:
+      - ${APP_DATA_DIR}/data/screenshot:/data
+
+    environment:
+      # Home Assistant's Umbrel app runs network_mode: host, so it has no
+      # container name to resolve and a container name would never have worked
+      # — which is why this was a hardcoded 192.168.1.210 under Portainer.
+      # GATEWAY_IP is Umbrel's app-network gateway, 10.21.0.1, which is the host
+      # as seen from inside this network: a host-networked Home Assistant is
+      # listening there. umbreld exports it to every app, and ZeroTier's
+      # official app addresses its own host-networked service the same way.
+      #
+      # Unlike a LAN address this survives the box changing IP. Override it in
+      # the app's settings if Home Assistant runs on a different machine.
+      HOME_ASSISTANT_URL: ${HOME_ASSISTANT_URL:-http://${GATEWAY_IP}:8123}
+
+      # A Home Assistant long-lived access token: Profile → Security →
+      # Long-lived access tokens. Set it in the app's settings rather than here,
+      # so it stays out of this repository. trmnl-ha exits at startup without
+      # it, so the container restarts until it is set.
+      ACCESS_TOKEN: ${ACCESS_TOKEN:-}
+
+      # Chromium is restarted between captures rather than held open. It is the
+      # largest thing in this app by far, and the point of the go-trmnl swap was
+      # to stop paying for idle processes.
+      KEEP_BROWSER_OPEN: "false"
+      DEBUG_LOGGING: "false"
+      TZ: ${TZ:-UTC}
+
+  # ============================================================================
+  # screen-sync — the glue go-trmnl does not have
+  # ============================================================================
+  #
+  # Under Terminus this service did not exist. trmnl-ha posted to Terminus'
+  # POST /api/screens with a URI, and Terminus came back and fetched the PNG.
+  # go-trmnl has no such endpoint — no /api/screens, no webhook, and its
+  # staticimage plugin deliberately reads only a base name inside its own
+  # assets directory, so it cannot be pointed at a URL either.
+  #
+  # What it does have is the admin UI's upload form. This loop pulls a fresh
+  # screenshot from trmnl-ha and posts it there on a timer:
+  #
+  #   GET  screenshot:10000/<dashboard>?viewport=…   -> a dithered PNG
+  #   POST server:8080/admin/screens/<id>/upload     -> multipart, field "image"
+  #
+  # Two details make that work rather than merely appear to. The handler stores
+  # the file under a fresh random name and rewrites the screen's settings, and
+  # UpdateScreenSettings sets rendered_hash = NULL, rendered_at = NULL. That
+  # null is load-bearing: the staticimage plugin declares a 24-hour cache TTL,
+  # so a screen whose file was merely overwritten on disk would keep serving the
+  # image it rendered yesterday. Going through the form is what invalidates it.
+  # Each push also leaks the previous asset file, which is why the server's
+  # hourly cleanup above is left on.
+  #
+  # ⚠️ This is an HTML form, not an API, and upstream owes it no stability. If
+  # the dashboard stops updating after a go-trmnl upgrade, look here first.
+  screen-sync:
+    image: curlimages/curl:8.22.0@sha256:58adaa4e8dca9c988bae2aba4ab3434a0bb2da16bbe3f92dec39ec7785166777
+    restart: on-failure
+    depends_on:
+      - server
+      - screenshot
+
+    environment:
+      # The screen to overwrite. Create it once in go-trmnl — Screens → new →
+      # Static Image — and put its id here, from the /admin/screens/<id> URL.
+      # Empty until then, and the loop idles rather than failing, so the app
+      # comes up clean on a first install.
+      SCREEN_ID: ${SCREEN_ID:-}
+
+      # trmnl-ha's pull-mode Fetch URL. Its UI composes this for you and offers
+      # a Copy button; every setting rides in the query string, so no schedule
+      # has to exist for it to work. /lovelace/0 is the default dashboard.
+      #
+      # 800x480 because that is what go-trmnl renders to, and palette=bw because
+      # trmnl-ha's dithering is the one tuned for e-paper. Set the go-trmnl
+      # screen's own dither mode to "threshold" to match: leaving it on
+      # Floyd-Steinberg dithers an already-dithered image, which is exactly the
+      # double conversion trmnl-ha warns makes the picture worse.
+      SCREENSHOT_URL: ${SCREENSHOT_URL:-http://mrfyda-trmnl_screenshot_1:10000/lovelace/0?viewport=800x480&dithering&dither_method=floyd-steinberg&palette=bw}
+
+      # How often to push. The panel's own refresh_rate governs what it shows;
+      # this only decides how stale the newest available image can be.
+      SYNC_INTERVAL: ${SYNC_INTERVAL:-300}
+
+      TARGET_URL: http://mrfyda-trmnl_server_1:8080
+      TARGET_USER: admin
+      TARGET_PASSWORD: ${APP_PASSWORD}
+
+    # The image's entrypoint is curl itself, so it is replaced with a shell.
+    # /tmp is writable by the image's unprivileged curl_user; nothing is kept.
+    entrypoint: ["/bin/sh", "-c"]
+    command:
+      - |
+        echo "screen-sync: interval $${SYNC_INTERVAL}s, target screen '$$SCREEN_ID'"
+        while true; do
+          if [ -z "$$SCREEN_ID" ]; then
+            echo "screen-sync: SCREEN_ID unset — create a Static Image screen in go-trmnl and set it in the app's settings"
+          elif ! curl -fsS --max-time 180 -o /tmp/screen.png "$$SCREENSHOT_URL"; then
+            # Chromium cold-starts on the first capture after a restart, and a
+            # Home Assistant dashboard can take a while to settle, hence 180s.
+            echo "screen-sync: screenshot failed"
+          elif ! curl -fsS --max-time 60 -u "$$TARGET_USER:$$TARGET_PASSWORD" \
+                 -F "image=@/tmp/screen.png;type=image/png" \
+                 -o /dev/null "$$TARGET_URL/admin/screens/$$SCREEN_ID/upload"; then
+            # The form answers 302 on success, which -f does not treat as an
+            # error. A 404 here means SCREEN_ID does not exist; a 401 means the
+            # admin password changed.
+            echo "screen-sync: upload failed"
+          fi
+          sleep "$$SYNC_INTERVAL"
+        done
+
+  # ============================================================================
+  # trmnl-joan-bridge — a Joan 6 panel pretending to be a TRMNL device
+  # ============================================================================
+  #
+  # Unchanged from its Portainer stack, and unaffected by the server swap: it
+  # speaks the device half of the BYOS contract — GET /api/display with ID and
+  # Access-Token headers, expecting image_url and refresh_rate back — and
+  # go-trmnl implements exactly that. It re-encodes the returned image as
+  # Visionect PV3 frames and forwards the panel's battery and RSSI back up as
+  # standard headers, so telemetry still lands in the device page.
+  #
+  # The one thing to know is that go-trmnl does not auto-provision: add the
+  # panel's MAC under Devices before this can get a token, or it will poll a
+  # 404 forever.
+  joan:
+    image: ghcr.io/mrfyda/trmnl-joan-bridge:4847885@sha256:65827227764a0c56a9e917f1820319701a6a304590c9be47969411e4d0618214
+    restart: on-failure
+    depends_on:
+      - server
+
+    ports:
+      # The panel opens this itself, from the LAN, and it is raw TCP rather than
+      # HTTP — the app_proxy cannot front it, so it is published directly. Point
+      # the Joan Configurator app at <umbrel-lan-ip>:11112.
+      - "11112:11112"
+
+    environment:
+      TRMNL_SERVER: http://mrfyda-trmnl_server_1:8080
+
+      # ⚠️ Uppercase. A lowercase MAC is rejected with "Invalid device ID".
+      DEVICE_ID: ${DEVICE_ID:-}
+
+      # ACCESS_TOKEN — the api_key go-trmnl issues for that MAC, from its device
+      # page — is deliberately absent here, and is the one setting that does not
+      # appear in the app's normal settings list.
+      #
+      # umbreld keys manifest-declared variables by name alone, globally across
+      # the app: #resolveEnvironmentVariables() dedupes into a flat Set<name>
+      # before ever looking at which services a name targets. Two services here
+      # genuinely read a variable called ACCESS_TOKEN — this one and the Home
+      # Assistant token above — and they hold different secrets, so only one of
+      # them can be declared in the manifest. The screenshot service took that
+      # slot because its variable also carries the more commonly rotated secret.
+      #
+      # Set this one under Settings → Advanced instead, which is keyed by
+      # service *and* name: service "joan", name "ACCESS_TOKEN". The bridge
+      # exits with "required: -trmnl-server, -device-id, -access-token" until
+      # you do, so a restarting joan container on a fresh install means this.
