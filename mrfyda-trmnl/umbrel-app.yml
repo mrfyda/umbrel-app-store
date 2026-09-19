@@ -2,7 +2,7 @@ manifestVersion: 1.1
 id: mrfyda-trmnl
 category: automation
 name: TRMNL
-version: "0.5.0h"
+version: "0.5.0i"
 tagline: Run your own TRMNL server and drive e-ink panels from your own data
 icon: https://raw.githubusercontent.com/mrfyda/umbrel-app-store/main/mrfyda-trmnl/icon.svg
 port: 2300
@@ -75,6 +75,16 @@ repo: https://github.com/gesellix/go-trmnl
 support: https://github.com/gesellix/go-trmnl/issues
 gallery: []
 releaseNotes: >-
+  0.5.0i picks up a Joan bridge that can read what this server sends it. With
+  the bridge finally authenticating, every fetch then failed with "image:
+  unknown format" — it reached the server, got a perfectly good image back, and
+  had no decoder for it. The BYOS contract has /api/display return a 1-bit BMP,
+  because that is what the stock TRMNL firmware renders and go-trmnl obliges,
+  but the bridge registered PNG and JPEG only. Terminus happens to serve PNG,
+  which is the sole reason this never came up before. Fixed upstream in
+  trmnl-joan-bridge by registering a BMP decoder, and pinned here.
+
+
   0.5.0h gives the Joan bridge's device id and access token a home on umbrelOS
   1.x. They were the last two settings still reachable only through 2.0's
   settings UI, and the bridge cannot be handed a config file the way the other

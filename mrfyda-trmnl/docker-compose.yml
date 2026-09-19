@@ -386,7 +386,7 @@ services:
   # panel's MAC under Devices before this can get a token, or it will poll a
   # 404 forever.
   joan:
-    image: ghcr.io/mrfyda/trmnl-joan-bridge:4847885@sha256:65827227764a0c56a9e917f1820319701a6a304590c9be47969411e4d0618214
+    image: ghcr.io/mrfyda/trmnl-joan-bridge:641c708@sha256:f58295ae6bc6df5f41f1cf29e249432ac5f4e072b27cdaa53a33529fba1b3eb9
     restart: on-failure
     depends_on:
       - server
