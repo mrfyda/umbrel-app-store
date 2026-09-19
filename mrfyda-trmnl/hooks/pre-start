@@ -1,0 +1,44 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+# Make sure every bind-mount source this app needs exists and is owned by the
+# user that owns app data, before compose has a chance to invent one.
+#
+# umbrelOS copies the whole app directory on install but only a whitelist on
+# update — docker-compose.yml, *.template, exports.sh, torrc, hooks and
+# umbrel-app.yml — and data/ is not on that list. So a data directory
+# introduced by a later version never arrives on a box that already has the
+# app. Docker then creates the missing bind-mount source itself, and Docker
+# creates it as root:root, which leaves the directory readable by the container
+# but not writable by the person who has to put a file in it.
+#
+# That is exactly what happened to data/screen-sync in 0.5.0e: it holds
+# sync.env, a file the user writes by hand, and it landed as root.
+#
+# hooks *is* on the update whitelist, so doing it here reaches boxes that
+# already missed a directory as well as any directory added later.
+
+APP_DIR="$(readlink -f "$(dirname "${BASH_SOURCE[0]}")/..")"
+APP_DATA_DIR="${APP_DIR}/data"
+
+# What Umbrel owns app data as, and what the server container is pinned to in
+# docker-compose.yml so it can write its SQLite database.
+DESIRED_OWNER="1000:1000"
+
+for directory in server screenshot screen-sync; do
+  target="${APP_DATA_DIR}/${directory}"
+
+  if [[ ! -d "${target}" ]]; then
+    echo "pre-start: creating ${target}"
+    mkdir -p "${target}"
+  fi
+
+  # Only the directory itself, never its contents: the server's database and
+  # secret.key are already correct, and a recursive chown over app data is a
+  # slow and needless risk on a Raspberry Pi.
+  current_owner="$(stat -c '%u:%g' "${target}")"
+  if [[ "${current_owner}" != "${DESIRED_OWNER}" ]]; then
+    echo "pre-start: chowning ${target} from ${current_owner} to ${DESIRED_OWNER}"
+    chown "${DESIRED_OWNER}" "${target}"
+  fi
+done

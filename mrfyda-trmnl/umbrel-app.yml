@@ -2,7 +2,7 @@ manifestVersion: 1.1
 id: mrfyda-trmnl
 category: automation
 name: TRMNL
-version: "0.5.0e"
+version: "0.5.0f"
 tagline: Run your own TRMNL server and drive e-ink panels from your own data
 icon: https://raw.githubusercontent.com/mrfyda/umbrel-app-store/main/mrfyda-trmnl/icon.svg
 port: 2300
@@ -73,6 +73,16 @@ repo: https://github.com/gesellix/go-trmnl
 support: https://github.com/gesellix/go-trmnl/issues
 gallery: []
 releaseNotes: >-
+  0.5.0f fixes the directory 0.5.0e asked you to write into arriving owned by
+  root. Updates copy only a whitelist of files and data/ is not on it, so a data
+  directory added by a new version never reaches a box that already has the app;
+  Docker then creates the missing bind-mount source itself, as root, leaving it
+  readable by the container but not writable by you. A pre-start hook now
+  creates each of these directories and corrects its owner before the containers
+  start, which repairs boxes that already have a root-owned one. Hooks are on
+  the update whitelist, so this reaches them.
+
+
   0.5.0e gives the dashboard sync the same escape hatch the Home Assistant
   token got in 0.5.0d, for the same reason: per-app settings are an umbrelOS
   2.0 feature, so on 1.x there was no way to tell the sync which screen to push
