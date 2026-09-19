@@ -25,7 +25,7 @@ APP_DATA_DIR="${APP_DIR}/data"
 # docker-compose.yml so it can write its SQLite database.
 DESIRED_OWNER="1000:1000"
 
-for directory in server screenshot screen-sync; do
+for directory in server screenshot screen-sync joan; do
   target="${APP_DATA_DIR}/${directory}"
 
   if [[ ! -d "${target}" ]]; then

@@ -172,5 +172,13 @@ declare `ACCESS_TOKEN` in its compose file at all: trmnl-ha merges environment
 and file config with `??`, and an empty string is not nullish, so a variable
 declared with an empty default would silently win over the file.
 
+The Joan bridge needs a third route again, because it is built `FROM scratch`
+and has no shell to read a file with. Its device id and token come in through
+`exports.sh`, which umbrelOS sources before it runs compose on every version, so
+they go in `APP_DATA_DIR/data/joan/joan.env`. That file is *parsed* for its two
+keys rather than sourced: `exports.sh` is sourced into the shell that goes on to
+start every app on the box, so executing user-supplied content there could
+clobber unrelated variables or abort an unrelated app's startup under `set -e`.
+
 It is also **arm64 only**, because the screenshotter is published as separate
 per-architecture images rather than one multi-arch manifest.

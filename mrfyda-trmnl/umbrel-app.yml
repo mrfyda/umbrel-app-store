@@ -2,7 +2,7 @@ manifestVersion: 1.1
 id: mrfyda-trmnl
 category: automation
 name: TRMNL
-version: "0.5.0g"
+version: "0.5.0h"
 tagline: Run your own TRMNL server and drive e-ink panels from your own data
 icon: https://raw.githubusercontent.com/mrfyda/umbrel-app-store/main/mrfyda-trmnl/icon.svg
 port: 2300
@@ -43,9 +43,11 @@ description: >-
 
   Setup order matters, and three settings cannot be filled in until the app is
   running. Add the panel's MAC under Devices, copy the access token go-trmnl
-  issues for it into the Joan bridge, create a Static Image screen and copy its
-  id into the screenshot sync. Until then those two containers restart and the
-  dashboard stays empty; the rest of the app works.
+  issues for it into APP_DATA_DIR/data/joan/joan.env as JOAN_DEVICE_ID and
+  JOAN_ACCESS_TOKEN, then create a Static Image screen and put its id in
+  APP_DATA_DIR/data/screen-sync/sync.env as SCREEN_ID. On umbrelOS 2.0 the
+  app's own settings do the same job. Until then the Joan bridge restarts and
+  the dashboard stays empty; the rest of the app works.
 
 
   ⚠️ Umbrel's login is disabled for this app. TRMNL's device protocol is a MAC
@@ -73,6 +75,17 @@ repo: https://github.com/gesellix/go-trmnl
 support: https://github.com/gesellix/go-trmnl/issues
 gallery: []
 releaseNotes: >-
+  0.5.0h gives the Joan bridge's device id and access token a home on umbrelOS
+  1.x. They were the last two settings still reachable only through 2.0's
+  settings UI, and the bridge cannot be handed a config file the way the other
+  containers can — it is built FROM scratch, so there is no shell in the image
+  to read one. They now come in through exports.sh, which umbrelOS sources
+  before it runs compose on every version: put JOAN_DEVICE_ID and
+  JOAN_ACCESS_TOKEN in APP_DATA_DIR/data/joan/joan.env. That file is read for
+  those two keys rather than executed, because exports.sh is sourced into the
+  shell that starts every app on the box.
+
+
   0.5.0g stops a restart costing five minutes of blank screen. The dashboard
   sync waits for the screenshotter to have started, which is not the same as
   waiting for it to listen — Bun and Chromium take a while — so the first cycle
@@ -229,7 +242,10 @@ environment:
     default: AA:BB:CC:DD:EE:FF
     note: >-
       The Joan panel's MAC address, uppercase — a lowercase one is rejected as
-      an invalid device ID. Add the same address under Devices in the admin UI.
+      an invalid device ID. Add the same address under Devices in the admin UI,
+      then put its access token beside this one. Both can instead go in
+      APP_DATA_DIR/data/joan/joan.env as JOAN_DEVICE_ID and JOAN_ACCESS_TOKEN,
+      which is the only route on umbrelOS 1.x.
   - name: SCREEN_ID
     services: [screen-sync]
     note: >-

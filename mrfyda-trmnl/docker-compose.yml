@@ -413,21 +413,29 @@ services:
       TRMNL_SERVER: http://mrfyda-trmnl_server_1:8080
 
       # ⚠️ Uppercase. A lowercase MAC is rejected with "Invalid device ID".
-      DEVICE_ID: ${DEVICE_ID:-}
+      DEVICE_ID: ${JOAN_DEVICE_ID:-}
 
-      # ACCESS_TOKEN — the api_key go-trmnl issues for that MAC, from its device
-      # page — is deliberately absent here, and is the one setting that does not
-      # appear in the app's normal settings list.
+      # The api_key go-trmnl issues for this MAC, from its device page. Both of
+      # these come in through exports.sh, which reads data/joan/joan.env before
+      # compose runs — see that file. It is the only route that works on every
+      # umbrelOS version, for two compounding reasons.
       #
-      # umbreld keys manifest-declared variables by name alone, globally across
-      # the app: #resolveEnvironmentVariables() dedupes into a flat Set<name>
-      # before ever looking at which services a name targets. Two services here
-      # genuinely read a variable called ACCESS_TOKEN — this one and the Home
-      # Assistant token above — and they hold different secrets, so only one of
-      # them can be declared in the manifest. The screenshot service took that
-      # slot because its variable also carries the more commonly rotated secret.
+      # Per-app settings are a 2.0 feature, so on 1.x nothing can be typed in at
+      # all. And this container cannot read a config file for itself the way
+      # screen-sync reads sync.env: the bridge is built FROM scratch, so there
+      # is no shell in the image to wrap its entrypoint with.
       #
-      # Set this one under Settings → Advanced instead, which is keyed by
-      # service *and* name: service "joan", name "ACCESS_TOKEN". The bridge
-      # exits with "required: -trmnl-server, -device-id, -access-token" until
-      # you do, so a restarting joan container on a fresh install means this.
+      # On 2.0 the settings still work and still win, because umbreld writes
+      # them into a compose override applied after this file. DEVICE_ID is
+      # declared in the manifest; the token is not, and cannot be — umbreld
+      # keys manifest variables by name alone across the whole app
+      # (#resolveEnvironmentVariables dedupes into a flat Set<name> before it
+      # reads which services a name targets), and the Home Assistant token above
+      # already holds the name ACCESS_TOKEN with a different secret in it. On
+      # 2.0 that one goes under Settings → Advanced, which is keyed by service
+      # and name together; joan.env needs no such workaround.
+      #
+      # Unset, the bridge exits with
+      # "required: -trmnl-server, -device-id, -access-token", so a joan
+      # container restarting on a fresh install means exactly this.
+      ACCESS_TOKEN: ${JOAN_ACCESS_TOKEN:-}
