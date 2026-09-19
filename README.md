@@ -141,6 +141,18 @@ it is reached at `$GATEWAY_IP`, the app network's gateway, which is the host
 seen from inside. ZeroTier's official app addresses its own host-networked
 service the same way. Nothing breaks when the box changes IP.
 
+The server's own base URL is the one thing a container name could not serve,
+because it has two consumers that do not share a resolver. The Joan bridge is a
+container; the admin UI's screen previews are `<img>` tags in your browser
+built from that same base URL. A container name leaves the previews blank, with
+nothing in the server log because the browser never makes the request. So the
+base URL is `$DEVICE_DOMAIN_NAME` — the device's own `.local` name, which the
+browser already resolves and which n8n's official app uses for the same job —
+and the bridge gets an `extra_hosts` entry mapping that name to `$GATEWAY_IP`,
+since Docker's resolver forwards to the host's nameservers and those answer
+ordinary DNS, not mDNS. A real TRMNL panel whose firmware skips mDNS is a third
+consumer, and wants a LAN address set in the app's settings.
+
 **One secret cannot go in the app's normal settings.** umbreld keys
 manifest-declared environment variables by name alone, globally across the app
 — `#resolveEnvironmentVariables()` dedupes into a flat set of names before it

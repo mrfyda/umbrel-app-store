@@ -130,16 +130,27 @@ services:
       TRMNL_DATA_DIR: /data
       TZ: ${TZ:-UTC}
 
-      # The base every image_url is built from, and therefore an address the
-      # *device* has to be able to reach — go-trmnl will not start without an
-      # absolute URL here.
+      # The base every absolute URL is built from, and go-trmnl will not start
+      # without one. It has two consumers that do not share a resolver, which is
+      # the whole difficulty:
       #
-      # The only device here is the joan service below, which shares this app
-      # network, so a container name is enough and nothing depends on the LAN.
-      # Point a real TRMNL panel at this app and that stops being true: set
-      # TRMNL_BASE_URL to http://<umbrel-lan-ip>:2300 in the app's settings,
-      # which keeps working for the bridge too.
-      TRMNL_BASE_URL: ${TRMNL_BASE_URL:-http://mrfyda-trmnl_server_1:8080}
+      #   - the joan bridge, a container, which fetches the image_url that
+      #     /api/display returns
+      #   - your browser, which loads the admin UI's screen previews — the
+      #     template is <img src="{{.BaseURL}}/uploads/{{hash}}.png">, an
+      #     absolute URL rather than a relative one
+      #
+      # A container name satisfies the first and silently breaks the second:
+      # previews come up empty because the browser cannot resolve
+      # mrfyda-trmnl_server_1, and nothing appears in the server log because the
+      # request is never made. So this is the device's own hostname, which the
+      # browser already resolves — it is what you typed to get here — and the
+      # bridge is given an extra_hosts entry so it can resolve it too.
+      #
+      # A real TRMNL panel is a third consumer whose firmware may not do mDNS.
+      # Set TRMNL_BASE_URL to http://<umbrel-lan-ip>:2300 in the app's settings
+      # if you add one; a LAN address satisfies all three.
+      TRMNL_BASE_URL: ${TRMNL_BASE_URL:-http://${DEVICE_DOMAIN_NAME}:2300}
 
       # HTTP Basic auth on /admin. APP_PASSWORD is Umbrel's per-app derived
       # secret, so this is stable across restarts without being stored here;
@@ -321,6 +332,18 @@ services:
       # HTTP — the app_proxy cannot front it, so it is published directly. Point
       # the Joan Configurator app at <umbrel-lan-ip>:11112.
       - "11112:11112"
+
+    # image_url comes back built from TRMNL_BASE_URL, which is the device's
+    # .local name so that browser previews work. A container cannot resolve
+    # that: Docker's embedded resolver forwards to the host's nameservers,
+    # which answer ordinary DNS and not mDNS, so the fetch would fail here.
+    #
+    # Mapping the name to the app network's gateway — the host, seen from
+    # inside — sends it to the port app_proxy publishes, which is the same
+    # server by a longer road. One image per refresh, so the extra hop costs
+    # nothing worth measuring.
+    extra_hosts:
+      - "${DEVICE_DOMAIN_NAME}:${GATEWAY_IP}"
 
     environment:
       TRMNL_SERVER: http://mrfyda-trmnl_server_1:8080

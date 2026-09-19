@@ -2,7 +2,7 @@ manifestVersion: 1.1
 id: mrfyda-trmnl
 category: automation
 name: TRMNL
-version: "0.5.0a"
+version: "0.5.0b"
 tagline: Run your own TRMNL server and drive e-ink panels from your own data
 icon: https://raw.githubusercontent.com/mrfyda/umbrel-app-store/main/mrfyda-trmnl/icon.svg
 port: 2300
@@ -73,6 +73,16 @@ repo: https://github.com/gesellix/go-trmnl
 support: https://github.com/gesellix/go-trmnl/issues
 gallery: []
 releaseNotes: >-
+  0.5.0b fixes empty screen previews in the admin UI. The preview is an
+  absolute URL built from the server's configured base URL, and that base URL
+  was a container name — fine for the Joan bridge, which is a container, and
+  unresolvable for the browser, so every preview came up blank with nothing in
+  the server log because the request was never made. The base URL is now the
+  device's own .local name, which the browser already resolves, and the bridge
+  gets a hosts entry pointing that name at the app network's gateway so it can
+  still fetch images. Still no upstream code and no hardcoded addresses.
+
+
   0.5.0a adds no upstream code — go-trmnl is still 0.5.0. The letter marks a
   packaging fix made in this store, and it is here because 0.5.0 could not
   install at all: the build context for the server image was written as a
@@ -187,8 +197,9 @@ environment:
       image can be; how often a panel wakes is its own refresh rate.
   - name: TRMNL_BASE_URL
     services: [server]
-    default: http://mrfyda-trmnl_server_1:8080
+    default: http://umbrel.local:2300
     note: >-
-      The address devices fetch images from. The default works for the bundled
-      Joan bridge. A real TRMNL panel on the LAN needs a LAN address instead,
-      e.g. http://192.168.1.10:2300, which keeps working for the bridge too.
+      The address images are served from — used by devices and by the admin
+      UI's screen previews. The default suits the bundled Joan bridge and your
+      browser. A real TRMNL panel whose firmware does not do mDNS needs a LAN
+      address instead, e.g. http://192.168.1.10:2300, which suits all three.
