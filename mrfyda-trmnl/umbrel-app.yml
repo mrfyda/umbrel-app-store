@@ -2,7 +2,7 @@ manifestVersion: 1.1
 id: mrfyda-trmnl
 category: automation
 name: TRMNL
-version: "0.5.0d"
+version: "0.5.0e"
 tagline: Run your own TRMNL server and drive e-ink panels from your own data
 icon: https://raw.githubusercontent.com/mrfyda/umbrel-app-store/main/mrfyda-trmnl/icon.svg
 port: 2300
@@ -73,6 +73,16 @@ repo: https://github.com/gesellix/go-trmnl
 support: https://github.com/gesellix/go-trmnl/issues
 gallery: []
 releaseNotes: >-
+  0.5.0e gives the dashboard sync the same escape hatch the Home Assistant
+  token got in 0.5.0d, for the same reason: per-app settings are an umbrelOS
+  2.0 feature, so on 1.x there was no way to tell the sync which screen to push
+  into and it idled forever. It now reads
+  APP_DATA_DIR/data/screen-sync/sync.env, sourced at the top of every cycle
+  rather than at startup, so writing or editing that file takes effect within
+  one interval and nothing needs restarting. Anything set there wins over the
+  app's settings.
+
+
   0.5.0d makes the Home Assistant token settable on umbrelOS 1.x. Per-app
   settings arrived in 2.0, so on 1.x this app's declared settings are ignored
   entirely and there is no field to type a token into. The screenshotter will
@@ -204,7 +214,9 @@ environment:
     note: >-
       The screen the Home Assistant dashboard is pushed into. Create a Static
       Image screen in the admin UI and take the number from its URL. Empty
-      leaves the dashboard sync idle.
+      leaves the sync idle. On umbrelOS 1.x, where these settings do not exist,
+      put SCREEN_ID=<n> in APP_DATA_DIR/data/screen-sync/sync.env instead — it
+      is re-read every cycle, so no restart is needed.
   - name: SCREENSHOT_URL
     services: [screen-sync]
     default: http://mrfyda-trmnl_screenshot_1:10000/lovelace/0?viewport=800x480&dithering&dither_method=floyd-steinberg&palette=bw

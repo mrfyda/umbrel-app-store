@@ -305,6 +305,22 @@ services:
       TARGET_USER: admin
       TARGET_PASSWORD: ${APP_PASSWORD}
 
+    volumes:
+      # An override file for everything above, because the settings those
+      # variables come from are an umbrelOS 2.0 feature and there is no way to
+      # type a screen id into a 1.x box at all. Write shell assignments into
+      # ${APP_DATA_DIR}/data/screen-sync/sync.env:
+      #
+      #   SCREEN_ID=2
+      #   SYNC_INTERVAL=300
+      #
+      # It is re-read at the top of every cycle, so an edit takes effect within
+      # one interval with nothing to restart, and it lives in app data, which an
+      # app update never rewrites. Anything set there wins over the app's
+      # settings — deliberately, since it is the only route on 1.x and an
+      # override is the expected meaning of a file like this on 2.0.
+      - ${APP_DATA_DIR}/data/screen-sync:/config:ro
+
     # The image's entrypoint is curl itself, so it is replaced with a shell.
     # /tmp is writable by the image's unprivileged curl_user; nothing is kept.
     entrypoint: ["/bin/sh", "-c"]
@@ -312,6 +328,9 @@ services:
       - |
         echo "screen-sync: interval $${SYNC_INTERVAL}s, target screen '$$SCREEN_ID'"
         while true; do
+          # Sourced per cycle rather than once at start, so editing the file is
+          # enough and the container never needs restarting.
+          [ -f /config/sync.env ] && . /config/sync.env
           if [ -z "$$SCREEN_ID" ]; then
             echo "screen-sync: SCREEN_ID unset — create a Static Image screen in go-trmnl and set it in the app's settings"
           elif ! curl -fsS --max-time 180 -o /tmp/screen.png "$$SCREENSHOT_URL"; then
