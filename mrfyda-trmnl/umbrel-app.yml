@@ -2,7 +2,7 @@ manifestVersion: 1.1
 id: mrfyda-trmnl
 category: automation
 name: TRMNL
-version: "0.5.0"
+version: "0.5.0a"
 tagline: Run your own TRMNL server and drive e-ink panels from your own data
 icon: https://raw.githubusercontent.com/mrfyda/umbrel-app-store/main/mrfyda-trmnl/icon.svg
 port: 2300
@@ -73,6 +73,17 @@ repo: https://github.com/gesellix/go-trmnl
 support: https://github.com/gesellix/go-trmnl/issues
 gallery: []
 releaseNotes: >-
+  0.5.0a adds no upstream code — go-trmnl is still 0.5.0. The letter marks a
+  packaging fix made in this store, and it is here because 0.5.0 could not
+  install at all: the build context for the server image was written as a
+  relative path, and Docker Compose resolves those against the directory of the
+  first --file it is given rather than the file the path appears in. umbrelOS
+  composes an app from several files with its own fragments first, so the
+  context was looked for inside umbreld's installation directory and the
+  install failed three times over with "unable to prepare context". An absolute
+  path via APP_DATA_DIR fixes it.
+
+
   First release. This app replaces three Portainer stacks — a Terminus server, a
   Home Assistant screenshotter and a Joan 6 bridge — with one Umbrel app, and
   swaps the server underneath them.
