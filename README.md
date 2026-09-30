@@ -25,6 +25,9 @@ repository's URL.
   Joan 6 panel. go-trmnl rather than Terminus, so the server is one static
   binary over SQLite instead of Ruby, Postgres, Sidekiq and Valkey.
   ([source](https://github.com/gesellix/go-trmnl))
+- **Minecraft Server** — a Fabric Minecraft server behind Lazymc, which starts
+  the server when a player joins and stops it when idle.
+  ([source](https://github.com/itzg/docker-minecraft-server))
 
 ## Versioning
 

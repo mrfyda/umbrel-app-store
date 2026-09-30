@@ -1,0 +1,59 @@
+services:
+  # Lazymc is the public-facing TCP proxy. It starts the server container on
+  # the first connection and stops it after it has been idle.
+  lazymc:
+    image: ghcr.io/joesturge/lazymc-docker-proxy:latest
+    networks:
+      minecraft-network:
+        ipv4_address: 172.22.0.2
+    restart: unless-stopped
+    volumes:
+      - minecraft:/server:ro
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+    ports:
+      - "25565:25565"
+
+  # Lazymc controls this container through the labels below, so it must not
+  # restart itself after being stopped for inactivity.
+  mc:
+    # stable currently resolves to the 2026.9.2 Java 25 image. Keep the tag
+    # for readability and the index digest for reproducible amd64/arm64 pulls.
+    image: itzg/minecraft-server:2026.9.2-java25@sha256:de5d1b1a83eba576f6c8a688fac2a3523ce457724cdebc8ea48d7818b74cdf6e
+    networks:
+      minecraft-network:
+        ipv4_address: 172.22.0.3
+    labels:
+      - lazymc.enabled=true
+      - lazymc.group=mc
+      - lazymc.server.address=mc:25565
+    tty: true
+    stdin_open: true
+    restart: "no"
+    environment:
+      EULA: "TRUE"
+      USE_AIKAR_FLAGS: "true"
+      TYPE: FABRIC
+      VERSION: LATEST
+      ONLINE_MODE: "false"
+      ENFORCE_SECURE_PROFILE: "false"
+      OPS: |-
+        mrfyda
+      SPAWN_PROTECTION: "0"
+      VERSION_FROM_MODRINTH_PROJECTS: "true"
+      MODRINTH_PROJECTS: |-
+        fabric-api
+        lithium
+        ferrite-core
+        krypton
+    volumes:
+      - minecraft:/data
+
+volumes:
+  minecraft: {}
+
+networks:
+  minecraft-network:
+    driver: bridge
+    ipam:
+      config:
+        - subnet: 172.22.0.0/16

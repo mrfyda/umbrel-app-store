@@ -1,0 +1,49 @@
+manifestVersion: 1.1
+id: mrfyda-minecraft
+category: games
+name: Minecraft Server
+version: "2026.9.2"
+tagline: A Fabric Minecraft server that sleeps when nobody is playing
+icon: https://raw.githubusercontent.com/mrfyda/umbrel-app-store/main/mrfyda-minecraft/icon.svg
+port: 25565
+description: >-
+  A self-hosted Fabric Minecraft server with a Lazymc proxy in front of it.
+  The proxy accepts connections on the standard Minecraft port and starts the
+  server when a player joins, then stops it after the configured idle period.
+
+
+  The server starts with Fabric, Aikar flags, and a small performance-focused
+  Modrinth set: Fabric API, Lithium, FerriteCore and Krypton. The server is
+  configured for offline mode and grants operator access to mrfyda; change the
+  values in docker-compose.yml before first start if your setup needs different
+  settings.
+
+
+  ⚠️ This app exposes Minecraft directly on port 25565. Umbrel authentication
+  does not apply to Minecraft clients. Use a whitelist, firewall rules or a
+  private network if the server should not be publicly reachable.
+
+
+  ⚠️ The server uses offline mode (ONLINE_MODE=false), so player identities are
+  not verified by Mojang. Only use this setting with players you trust, and
+  understand that usernames can be impersonated.
+
+
+  ⚠️ The app mounts the host's Docker socket read-only so Lazymc can start and
+  stop the Minecraft container. Docker socket access is highly privileged even
+  when the mount is read-only.
+developer: mrfyda
+website: https://github.com/joesturge/lazymc-docker-proxy
+submitter: mrfyda
+submission: https://github.com/mrfyda/umbrel-app-store
+repo: https://github.com/itzg/docker-minecraft-server
+support: https://github.com/itzg/docker-minecraft-server/issues
+gallery: []
+releaseNotes: >-
+  Packages Lazymc with itzg's 2026.9.2 Java 25 Minecraft server image and a
+  persistent Minecraft data volume. The Minecraft server itself tracks the
+  latest release through VERSION=LATEST at startup.
+dependencies: []
+path: ""
+defaultUsername: ""
+defaultPassword: ""

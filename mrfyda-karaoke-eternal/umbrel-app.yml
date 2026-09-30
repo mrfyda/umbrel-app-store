@@ -4,7 +4,7 @@ category: media
 name: Karaoke Eternal
 version: "2.0.2b"
 tagline: Host karaoke parties where everyone queues songs from their phone
-icon: https://raw.githubusercontent.com/mrfyda/umbrel-app-store/main/mrfyda-karaoke-eternal/icon.png
+icon: https://raw.githubusercontent.com/mrfyda/umbrel-app-store/main/mrfyda-karaoke-eternal/icon.svg
 port: 8090
 description: >-
   Everyone at the party opens the app on their own phone, searches the library

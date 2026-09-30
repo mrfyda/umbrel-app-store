@@ -4,7 +4,7 @@ category: media
 name: Dispatcharr
 version: "0.31.0a"
 tagline: Manage IPTV streams, EPG data and VOD in one place
-icon: https://raw.githubusercontent.com/mrfyda/umbrel-app-store/main/mrfyda-dispatcharr/icon.png
+icon: https://raw.githubusercontent.com/mrfyda/umbrel-app-store/main/mrfyda-dispatcharr/icon.svg
 port: 9191
 description: >-
   Import M3U playlists and XMLTV guides, merge and dedupe them into channels you
