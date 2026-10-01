@@ -58,57 +58,7 @@ services:
   #     go-trmnl's entire route surface is the device API plus an /admin HTML
   #     UI. That is what the screen-sync service below exists to work around.
   server:
-    # ⚠️ TEMPORARY. Every other service here names a published image; this one
-    # is built on the host from go-trmnl's public release binary, because its
-    # container image is published but not publicly pullable. Those are two
-    # different things on GHCR: the push succeeds and the manifest is there,
-    # but package visibility defaults to private and no workflow changes it, so
-    # ghcr.io/gesellix/go-trmnl issues no anonymous pull token at all — where
-    # every other image in this file does — and umbrelOS pulls anonymously.
-    # Upstream has been asked to make it public.
-    #
-    # When that happens, this whole block becomes one line again, and the
-    # go-trmnl-image directory can be deleted:
-    #
-    #   image: ghcr.io/gesellix/go-trmnl:0.5.0@sha256:21711d3e5737504ed2286524569970e62243481e590d832c6bf96012e6751c9a
-    #
-    # That is the index digest all three of 0.5.0, 0.5 and latest were pushed
-    # as, kept here so the switch back needs no lookup. Note the tag has no v:
-    # the git tag does, but docker/metadata-action's {{version}} pattern strips
-    # it, so v0.5.0 would 404.
-    #
-    # `image:` is deliberately absent rather than set alongside `build:`.
-    # umbreld collects images to pre-pull with
-    # `Object.values(compose.services).map(s => s.image).filter(Boolean)`, so a
-    # service with only a build context is skipped by the pull and then built
-    # by `docker compose up --detach --build`, which is how umbrelOS starts
-    # apps. Naming an image here would put the unpullable reference straight
-    # back into the pull list.
-    build:
-      # Absolute, via APP_DATA_DIR, and it has to be. A relative context is
-      # resolved against Compose's project directory, which is the directory of
-      # the *first* --file — and umbrelOS composes an app from several, its own
-      # legacy-compat/docker-compose.app_proxy.yml first and the app's own last:
-      #
-      #   unable to prepare context: path "/opt/umbreld/source/modules/apps/
-      #   legacy-compat/go-trmnl-image" not found
-      #
-      # is what `./go-trmnl-image` gets you. APP_DATA_DIR is where the app
-      # directory was rsynced to at install, which is where this file and that
-      # directory both actually live.
-      context: ${APP_DATA_DIR}/go-trmnl-image
-      args:
-        # Upstream's git tag, v-prefixed — release *assets* are named after the
-        # git tag even though the image tags are not.
-        VERSION: v0.5.0
-        # sha256 of that release's checksums.sha256, pinned here out of band so
-        # the checksum file cannot vouch for itself. See the Dockerfile.
-        CHECKSUMS_SHA256: fd26219cc78bee0f7f6b1078d06a557f5cc83a5a280c35a1003df6ee35af25af
-    # Both args live here rather than in the Dockerfile on purpose: umbrelOS
-    # copies the whole app directory on install but only a whitelist on update,
-    # and docker-compose.yml is on that whitelist while go-trmnl-image is not.
-    # A version bumped in the Dockerfile would reach fresh installs and silently
-    # skip everyone updating.
+    image: ghcr.io/gesellix/go-trmnl:0.8.0@sha256:0b4bff1289af1b5a524291ac6ee2607a77c692f6ae70d6cfe10cbedf749f1649
     restart: on-failure
 
     # The image is gcr.io/distroless/static-debian12:nonroot, which runs as uid
@@ -210,34 +160,6 @@ services:
       # the app's settings if Home Assistant runs on a different machine.
       HOME_ASSISTANT_URL: ${HOME_ASSISTANT_URL:-http://${GATEWAY_IP}:8123}
 
-      # ACCESS_TOKEN — a Home Assistant long-lived access token, from Profile →
-      # Security — is deliberately not declared here, and writing
-      # `ACCESS_TOKEN: ${ACCESS_TOKEN:-}` would actively break things.
-      #
-      # trmnl-ha merges its configuration with nullish coalescing:
-      #
-      #   access_token: process.env['ACCESS_TOKEN'] ?? fileOptions.access_token
-      #
-      # An empty string is not nullish, so a declaration that defaults to empty
-      # does not fall through to the file — it wins, as the empty value, and the
-      # file is ignored. Leaving the variable genuinely absent is what lets both
-      # ways of setting it work:
-      #
-      #   umbrelOS 2.0+  the app's settings, which umbreld injects into this
-      #                  service through a compose override
-      #   umbrelOS 1.x   ${APP_DATA_DIR}/data/screenshot/options.json, which
-      #                  lands at /data/options.json inside the container:
-      #                  {"access_token": "..."}
-      #
-      # Per-app settings only exist from umbrelOS 2.0, so on 1.x the file is the
-      # only route — and it is the better one for a secret regardless, living in
-      # app data that an app update never rewrites.
-      #
-      # The file must be valid JSON; a malformed one is a startup FATAL. It does
-      # not switch the app into Home Assistant add-on mode, because that needs
-      # SUPERVISOR_TOKEN or an options file with no environment configuration at
-      # all, and HOME_ASSISTANT_URL above is always set.
-
       # Chromium is restarted between captures rather than held open. It is the
       # largest thing in this app by far, and the point of the go-trmnl swap was
       # to stop paying for idle processes.
@@ -305,39 +227,15 @@ services:
       TARGET_USER: admin
       TARGET_PASSWORD: ${APP_PASSWORD}
 
-    volumes:
-      # An override file for everything above, because the settings those
-      # variables come from are an umbrelOS 2.0 feature and there is no way to
-      # type a screen id into a 1.x box at all. Write shell assignments into
-      # ${APP_DATA_DIR}/data/screen-sync/sync.env:
-      #
-      #   SCREEN_ID=2
-      #   SYNC_INTERVAL=300
-      #
-      # It is re-read at the top of every cycle, so an edit takes effect within
-      # one interval with nothing to restart, and it lives in app data, which an
-      # app update never rewrites. Anything set there wins over the app's
-      # settings — deliberately, since it is the only route on 1.x and an
-      # override is the expected meaning of a file like this on 2.0.
-      - ${APP_DATA_DIR}/data/screen-sync:/config:ro
-
     # The image's entrypoint is curl itself, so it is replaced with a shell.
     # /tmp is writable by the image's unprivileged curl_user; nothing is kept.
     entrypoint: ["/bin/sh", "-c"]
     command:
       - |
         while true; do
-          # Sourced per cycle rather than once at start, so editing the file is
-          # enough and the container never needs restarting. It is also why
-          # there is no banner before this point: at startup SCREEN_ID is still
-          # whatever the environment said, so anything printed up there would
-          # report an empty screen id on exactly the boxes where the file is the
-          # only way to set one.
-          [ -f /config/sync.env ] && . /config/sync.env
-
           ok=false
           if [ -z "$$SCREEN_ID" ]; then
-            echo "screen-sync: SCREEN_ID unset — create a Static Image screen in go-trmnl, then set it in the app's settings or in sync.env"
+            echo "screen-sync: SCREEN_ID unset — create a Static Image screen in go-trmnl, then set it in the app's settings"
           elif ! curl -fsS --max-time 180 -o /tmp/screen.png "$$SCREENSHOT_URL"; then
             # Chromium cold-starts on the first capture after a restart, and a
             # Home Assistant dashboard can take a while to settle, hence 180s.
@@ -362,8 +260,8 @@ services:
           #
           # With one sleep for both outcomes that cost a full SYNC_INTERVAL of
           # blank screen every time the app restarted. It also covers a
-          # SCREEN_ID that has just been written into sync.env, which now takes
-          # effect in seconds rather than up to five minutes.
+          # SCREEN_ID that has just been entered in the app's settings, which
+          # takes effect after the settings override is applied.
           if [ "$$ok" = true ]; then
             sleep "$$SYNC_INTERVAL"
           else
@@ -413,29 +311,9 @@ services:
       TRMNL_SERVER: http://mrfyda-trmnl_server_1:8080
 
       # ⚠️ Uppercase. A lowercase MAC is rejected with "Invalid device ID".
-      DEVICE_ID: ${JOAN_DEVICE_ID:-}
+      DEVICE_ID: ${DEVICE_ID:-}
 
-      # The api_key go-trmnl issues for this MAC, from its device page. Both of
-      # these come in through exports.sh, which reads data/joan/joan.env before
-      # compose runs — see that file. It is the only route that works on every
-      # umbrelOS version, for two compounding reasons.
-      #
-      # Per-app settings are a 2.0 feature, so on 1.x nothing can be typed in at
-      # all. And this container cannot read a config file for itself the way
-      # screen-sync reads sync.env: the bridge is built FROM scratch, so there
-      # is no shell in the image to wrap its entrypoint with.
-      #
-      # On 2.0 the settings still work and still win, because umbreld writes
-      # them into a compose override applied after this file. DEVICE_ID is
-      # declared in the manifest; the token is not, and cannot be — umbreld
-      # keys manifest variables by name alone across the whole app
-      # (#resolveEnvironmentVariables dedupes into a flat Set<name> before it
-      # reads which services a name targets), and the Home Assistant token above
-      # already holds the name ACCESS_TOKEN with a different secret in it. On
-      # 2.0 that one goes under Settings → Advanced, which is keyed by service
-      # and name together; joan.env needs no such workaround.
-      #
-      # Unset, the bridge exits with
-      # "required: -trmnl-server, -device-id, -access-token", so a joan
-      # container restarting on a fresh install means exactly this.
+      # Unset, the bridge exits with "required: -trmnl-server, -device-id,
+      # -access-token". Configure both values in the app's umbrelOS 2.0
+      # settings.
       ACCESS_TOKEN: ${JOAN_ACCESS_TOKEN:-}

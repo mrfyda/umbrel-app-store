@@ -1,8 +1,8 @@
 manifestVersion: 1.1
 id: mrfyda-minecraft
 category: games
-name: Minecraft Server
-version: "2026.9.2"
+name: Minecraft
+version: "2026.9.2e"
 tagline: A Fabric Minecraft server that sleeps when nobody is playing
 icon: https://raw.githubusercontent.com/mrfyda/umbrel-app-store/main/mrfyda-minecraft/icon.svg
 port: 25565
@@ -40,9 +40,8 @@ repo: https://github.com/itzg/docker-minecraft-server
 support: https://github.com/itzg/docker-minecraft-server/issues
 gallery: []
 releaseNotes: >-
-  Packages Lazymc with itzg's 2026.9.2 Java 25 Minecraft server image and a
-  persistent Minecraft data volume. The Minecraft server itself tracks the
-  latest release through VERSION=LATEST at startup.
+  Packaging revision: recreate the Minecraft 1.19.2 grass-block pack icon as
+  native SVG geometry and pixel-texture patterns.
 dependencies: []
 path: ""
 defaultUsername: ""

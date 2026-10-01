@@ -2,7 +2,7 @@ manifestVersion: 1.1
 id: mrfyda-trmnl
 category: automation
 name: TRMNL
-version: "0.5.0i"
+version: "0.8.0"
 tagline: Run your own TRMNL server and drive e-ink panels from your own data
 icon: https://raw.githubusercontent.com/mrfyda/umbrel-app-store/main/mrfyda-trmnl/icon.svg
 port: 2300
@@ -41,13 +41,10 @@ description: >-
   you list it.
 
 
-  Setup order matters, and three settings cannot be filled in until the app is
-  running. Add the panel's MAC under Devices, copy the access token go-trmnl
-  issues for it into APP_DATA_DIR/data/joan/joan.env as JOAN_DEVICE_ID and
-  JOAN_ACCESS_TOKEN, then create a Static Image screen and put its id in
-  APP_DATA_DIR/data/screen-sync/sync.env as SCREEN_ID. On umbrelOS 2.0 the
-  app's own settings do the same job. Until then the Joan bridge restarts and
-  the dashboard stays empty; the rest of the app works.
+  Setup order matters. Add the panel's MAC under Devices, then enter the
+  panel credentials and the Static Image screen id in this app's umbrelOS 2.0
+  settings. Until the device and screen exist, the Joan bridge and dashboard
+  sync remain idle; the rest of the app works.
 
 
   ⚠️ Umbrel's login is disabled for this app. TRMNL's device protocol is a MAC
@@ -75,150 +72,9 @@ repo: https://github.com/gesellix/go-trmnl
 support: https://github.com/gesellix/go-trmnl/issues
 gallery: []
 releaseNotes: >-
-  0.5.0i picks up a Joan bridge that can read what this server sends it. With
-  the bridge finally authenticating, every fetch then failed with "image:
-  unknown format" — it reached the server, got a perfectly good image back, and
-  had no decoder for it. The BYOS contract has /api/display return a 1-bit BMP,
-  because that is what the stock TRMNL firmware renders and go-trmnl obliges,
-  but the bridge registered PNG and JPEG only. Terminus happens to serve PNG,
-  which is the sole reason this never came up before. Fixed upstream in
-  trmnl-joan-bridge by registering a BMP decoder, and pinned here.
-
-
-  0.5.0h gives the Joan bridge's device id and access token a home on umbrelOS
-  1.x. They were the last two settings still reachable only through 2.0's
-  settings UI, and the bridge cannot be handed a config file the way the other
-  containers can — it is built FROM scratch, so there is no shell in the image
-  to read one. They now come in through exports.sh, which umbrelOS sources
-  before it runs compose on every version: put JOAN_DEVICE_ID and
-  JOAN_ACCESS_TOKEN in APP_DATA_DIR/data/joan/joan.env. That file is read for
-  those two keys rather than executed, because exports.sh is sourced into the
-  shell that starts every app on the box.
-
-
-  0.5.0g stops a restart costing five minutes of blank screen. The dashboard
-  sync waits for the screenshotter to have started, which is not the same as
-  waiting for it to listen — Bun and Chromium take a while — so the first cycle
-  after any restart usually failed to connect, and a single sleep for both
-  outcomes then held it there for a whole interval. Failures now back off for
-  15 seconds instead, so a lost startup race costs seconds, and a screen id
-  just written into sync.env takes effect almost at once. The startup banner is
-  gone too: it printed before the config file was read, so it always claimed an
-  empty screen id on the boxes where that file is the only way to set one.
-
-
-  0.5.0f fixes the directory 0.5.0e asked you to write into arriving owned by
-  root. Updates copy only a whitelist of files and data/ is not on it, so a data
-  directory added by a new version never reaches a box that already has the app;
-  Docker then creates the missing bind-mount source itself, as root, leaving it
-  readable by the container but not writable by you. A pre-start hook now
-  creates each of these directories and corrects its owner before the containers
-  start, which repairs boxes that already have a root-owned one. Hooks are on
-  the update whitelist, so this reaches them.
-
-
-  0.5.0e gives the dashboard sync the same escape hatch the Home Assistant
-  token got in 0.5.0d, for the same reason: per-app settings are an umbrelOS
-  2.0 feature, so on 1.x there was no way to tell the sync which screen to push
-  into and it idled forever. It now reads
-  APP_DATA_DIR/data/screen-sync/sync.env, sourced at the top of every cycle
-  rather than at startup, so writing or editing that file takes effect within
-  one interval and nothing needs restarting. Anything set there wins over the
-  app's settings.
-
-
-  0.5.0d makes the Home Assistant token settable on umbrelOS 1.x. Per-app
-  settings arrived in 2.0, so on 1.x this app's declared settings are ignored
-  entirely and there is no field to type a token into. The screenshotter will
-  also read its configuration from a file, but only if the environment variable
-  is genuinely absent — it merges the two with ?? and an empty string is not
-  nullish, so declaring the variable with an empty default silently beat the
-  file. The declaration is gone, so on 1.x the token can go in
-  APP_DATA_DIR/data/screenshot/options.json, and on 2.0 the settings UI still
-  works. The file is the better place for a secret either way: app updates
-  rewrite docker-compose.yml but never touch app data.
-
-
-  0.5.0c is a documentation fix. An unset Home Assistant token produces a
-  screenshot of Home Assistant's login page rather than any kind of error: the
-  screenshotter's startup guard only fires when neither HOME_ASSISTANT_URL nor
-  ACCESS_TOKEN is set, and this app always sets the former, so a missing token
-  leaves the container healthy and quietly photographing a login form. The
-  setting now says so, because the symptom does not point at the cause.
-
-
-  0.5.0b fixes empty screen previews in the admin UI. The preview is an
-  absolute URL built from the server's configured base URL, and that base URL
-  was a container name — fine for the Joan bridge, which is a container, and
-  unresolvable for the browser, so every preview came up blank with nothing in
-  the server log because the request was never made. The base URL is now the
-  device's own .local name, which the browser already resolves, and the bridge
-  gets a hosts entry pointing that name at the app network's gateway so it can
-  still fetch images. Still no upstream code and no hardcoded addresses.
-
-
-  0.5.0a adds no upstream code — go-trmnl is still 0.5.0. The letter marks a
-  packaging fix made in this store, and it is here because 0.5.0 could not
-  install at all: the build context for the server image was written as a
-  relative path, and Docker Compose resolves those against the directory of the
-  first --file it is given rather than the file the path appears in. umbrelOS
-  composes an app from several files with its own fragments first, so the
-  context was looked for inside umbreld's installation directory and the
-  install failed three times over with "unable to prepare context". An absolute
-  path via APP_DATA_DIR fixes it.
-
-
-  First release. This app replaces three Portainer stacks — a Terminus server, a
-  Home Assistant screenshotter and a Joan 6 bridge — with one Umbrel app, and
-  swaps the server underneath them.
-
-
-  Terminus is TRMNL's reference BYOS and runs as five containers: a Hanami web
-  app, a Sidekiq worker, Postgres, Valkey and a one-shot certificate installer.
-  go-trmnl speaks the same device protocol as a single static Go binary over
-  SQLite, with screens drawn in-process rather than by a headless browser. Seven
-  containers become four, and the two datastores and the background worker go
-  away entirely.
-
-
-  Two things are lost with Terminus, and both are deliberate rather than
-  missing. TRMNL's official and community plugins are Liquid templates rendered
-  against a HTML/CSS framework by a browser; go-trmnl's pure-Go pipeline cannot
-  run them, and says so in its own roadmap. You get its six native screens
-  instead. Terminus also accepts screens from outside over POST /api/screens,
-  which is what the Home Assistant screenshotter used, and go-trmnl has no such
-  endpoint — no webhook, and a static-image plugin that deliberately reads only
-  a filename inside its own assets directory.
-
-
-  A small sync container closes that gap: it pulls a fresh screenshot and posts
-  it to the admin UI's upload form on a timer. That path works for a specific
-  reason worth writing down. The static-image plugin declares a 24-hour cache
-  TTL, so a screen whose file was simply overwritten on disk would keep serving
-  yesterday's render. The upload handler rewrites the screen's settings, and
-  that write nulls rendered_hash, which is what actually invalidates the cache.
-  It is an HTML form rather than an API, so a go-trmnl upgrade could change it;
-  a dashboard that stops updating is the symptom.
-
-
-  No LAN addresses are hardcoded anywhere, which the Portainer stacks all needed.
-  The four containers address each other over Umbrel's app network by name, and
-  Home Assistant — whose Umbrel app runs with host networking and so has no name
-  to resolve — is reached at the app network's gateway instead. Nothing breaks
-  when the box changes IP.
-
-
-  One service is built during installation rather than pulled, which is
-  temporary and worth knowing about because it makes the first start slower.
-  go-trmnl's container image is published to GHCR but not publicly pullable —
-  the release build pushes a multi-arch manifest and succeeds, but package
-  visibility is a separate setting that defaults to private, and umbrelOS pulls
-  anonymously. Upstream has been asked to make it public. Until then the app
-  builds that image itself from go-trmnl's release binary, which is public on
-  the same repository and is what the image is built from anyway: a download
-  verified against a pinned checksum, copied into the same distroless base
-  upstream uses. Nothing is compiled. When the package goes public this reverts
-  to an ordinary pinned image reference.
+  Upstream 0.8.0. This update brings the bundled go-trmnl server to the latest
+  upstream release while retaining the Home Assistant screenshotter and Joan
+  6 bridge packaging.
 dependencies: []
 path: "/admin"
 defaultUsername: "admin"
@@ -235,11 +91,9 @@ environment:
     services: [screenshot]
     note: >-
       Home Assistant long-lived access token, from Profile → Security. Needs
-      umbrelOS 2.0 or later — these settings do not exist on 1.x, where the
-      token goes in APP_DATA_DIR/data/screenshot/options.json as
-      {"access_token": "..."} instead. Unset either way, the screenshotter still
-      starts and reports healthy but captures Home Assistant's login page: a
-      dithered "Welcome home!" on the panel means this and nothing else.
+      to be set before the screenshotter can capture a private dashboard.
+      Without it, the screenshotter still starts but captures Home Assistant's
+      login page.
   - name: HOME_ASSISTANT_URL
     services: [screenshot]
     default: http://10.21.0.1:8123
@@ -253,17 +107,14 @@ environment:
     note: >-
       The Joan panel's MAC address, uppercase — a lowercase one is rejected as
       an invalid device ID. Add the same address under Devices in the admin UI,
-      then put its access token beside this one. Both can instead go in
-      APP_DATA_DIR/data/joan/joan.env as JOAN_DEVICE_ID and JOAN_ACCESS_TOKEN,
-      which is the only route on umbrelOS 1.x.
+      then enter its access token in Settings → Advanced for the joan service
+      as ACCESS_TOKEN. The bridge restarts until both values are set.
   - name: SCREEN_ID
     services: [screen-sync]
     note: >-
       The screen the Home Assistant dashboard is pushed into. Create a Static
       Image screen in the admin UI and take the number from its URL. Empty
-      leaves the sync idle. On umbrelOS 1.x, where these settings do not exist,
-      put SCREEN_ID=<n> in APP_DATA_DIR/data/screen-sync/sync.env instead — it
-      is re-read every cycle, so no restart is needed.
+      leaves the sync idle.
   - name: SCREENSHOT_URL
     services: [screen-sync]
     default: http://mrfyda-trmnl_screenshot_1:10000/lovelace/0?viewport=800x480&dithering&dither_method=floyd-steinberg&palette=bw
@@ -285,4 +136,4 @@ environment:
       The address images are served from — used by devices and by the admin
       UI's screen previews. The default suits the bundled Joan bridge and your
       browser. A real TRMNL panel whose firmware does not do mDNS needs a LAN
-      address instead, e.g. http://192.168.1.10:2300, which suits all three.
+  address instead, e.g. http://192.168.1.10:2300, which suits all three.

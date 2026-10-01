@@ -1,14 +1,19 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512">
-  <rect width="512" height="512" fill="#5b8c45"/>
-  <path fill="#7fbd4f" d="M0 0h512v176L390 238 256 188 124 242 0 178z"/>
-  <path fill="#3f6c39" d="M0 350l128-73 128 58 128-66 128 70v173H0z"/>
-  <path fill="#6b4428" d="M0 390l128-72 128 58 128-66 128 70v152H0z"/>
-  <path fill="#8d5a33" d="M0 438l128-62 128 58 128-72 128 70v80H0z"/>
-  <path fill="#263238" d="M128 176h256v190H128z"/>
-  <path fill="#d7eef2" d="M154 202h204v132H154z"/>
-  <path fill="#4b7cbd" d="M154 288h204v46H154z"/>
-  <path fill="#4b7cbd" d="M154 202h48v48h-48zm156 0h48v48h-48z"/>
-  <path fill="#e5b85c" d="M190 250h132v84H190z"/>
-  <path fill="#b37835" d="M190 250h132v24H190z"/>
-  <path fill="#263238" d="M174 178h36v36h-36zm128 0h36v36h-36z"/>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 128 128" shape-rendering="crispEdges">
+  <!-- Native vector recreation of the supplied Minecraft grass-block icon. -->
+  <polygon points="0 0 128 0 128 45 64 81 0 45" fill="#79a83d"/>
+  <polygon points="0 45 64 81 64 128 0 93" fill="#4a3221"/>
+  <polygon points="128 45 64 81 64 128 128 93" fill="#5a3d27"/>
+
+  <!-- Grass pixels across the top face. -->
+  <path fill="#87b345" d="M0 0h16v8H0zm32 0h16v8H32zm48 0h16v8H80zm32 0h16v8h-16zM16 16h16v8H16zm48 0h16v8H64zm32 0h16v8H96zM0 32h16v8H0zm32 0h16v8H32zm48 0h16v8H80zm32 0h16v8h-16z"/>
+  <path fill="#679333" d="M16 8h16v8H16zm48 0h16v8H64zm48 0h16v8h-16zM0 24h16v8H0zm48 0h16v8H48zm48 0h16v8H96zM16 40h16v5H16zm64 0h16v5H80z"/>
+  <path fill="#8ab64a" d="M48 8h16v8H48zm48 16h16v8H96zM32 40h16v8H32z"/>
+
+  <!-- Soil pixels on the two visible sides. -->
+  <path fill="#65452e" d="M0 53l16 9v16L0 69zm32 18l16 9v16l-16-9zM0 85l16 9v16L0 101zm80-14l16-9v16l-16 9zm32-18l16-9v16l-16 9zm-16 50l16-9v16l-16 9z"/>
+  <path fill="#382516" d="M16 62l16 9v16l-16-9zm32 18l16 9v16l-16-9zM16 94l16 9v16l-16-9zm64-23l16-9v16l-16 9zm32-18l16-9v16l-16 9zm-32 50l16-9v16l-16 9z"/>
+  <path fill="#7b593b" d="M0 69l16 9v8L0 77zm32 18l16 9v8l-16-9zm48-18l16-9v8l-16 9zm32-18l16-9v8l-16 9z"/>
+
+  <polygon points="0 45 64 81 128 45 128 53 64 89 0 53" fill="#2e4218" opacity=".72"/>
+  <path fill="#8fbd4b" d="M0 0h128v4H0z" opacity=".55"/>
 </svg>
