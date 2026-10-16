@@ -2,7 +2,7 @@ manifestVersion: 1.1
 id: mrfyda-rs-matter-server
 category: automation
 name: rs-matter-server
-version: "0.1.5"
+version: "0.1.6"
 tagline: A Matter controller server in Rust
 icon: https://raw.githubusercontent.com/mrfyda/umbrel-app-store/main/mrfyda-rs-matter-server/icon.svg
 port: 5580
@@ -37,8 +37,8 @@ repo: https://github.com/mrfyda/rs-matter-server
 support: https://github.com/mrfyda/rs-matter-server/issues
 gallery: []
 releaseNotes: >-
-  Upstream 0.1.5. The Matter controller now includes the latest upstream
-  reliability and compatibility fixes.
+  Upstream 0.1.6. Includes the latest Matter controller reliability and
+  compatibility fixes.
 dependencies: []
 path: "/health"
 defaultUsername: ""

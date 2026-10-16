@@ -8,7 +8,7 @@ services:
     # Pinned to a released version and its index digest, the way the official
     # app store pins its images: the tag says which release this is, the digest
     # makes it the exact one that was tested here.
-    image: ghcr.io/mrfyda/rs-matter-server:0.1.5@sha256:2f0f28598e41badebeaa76cfa880805811b78b697304dcd6c20939a0932b3a0f
+    image: ghcr.io/mrfyda/rs-matter-server:0.1.6@sha256:e4e121149c78a2e2c5f18403148125fc6d6bbee587709b20ce459ff84ad35597
     restart: on-failure
     stop_grace_period: 1m
 
