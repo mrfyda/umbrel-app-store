@@ -2,7 +2,7 @@ manifestVersion: 1.1
 id: mrfyda-dispatcharr
 category: media
 name: Dispatcharr
-version: "0.31.0a"
+version: "0.31.0b"
 tagline: Manage IPTV streams, EPG data and VOD in one place
 icon: https://raw.githubusercontent.com/mrfyda/umbrel-app-store/main/mrfyda-dispatcharr/icon.svg
 port: 9191
@@ -53,9 +53,8 @@ repo: https://github.com/Dispatcharr/Dispatcharr
 support: https://github.com/Dispatcharr/Dispatcharr/issues
 gallery: []
 releaseNotes: >-
-  0.31.0a adds no upstream code. The letter marks packaging-only changes
-  made in this store — the Valkey sidecar, the Lazytainer fix and the new
-  icon, all described at the end of these notes. Upstream is still 0.31.0.
+  0.31.0b is packaging-only. It updates the icon URL to the committed SVG so
+  Umbrel no longer requests the deleted PNG. Upstream is still 0.31.0.
 
 
   Upstream 0.31.0. The most useful part here is logging: container output is

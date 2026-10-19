@@ -2,7 +2,7 @@ manifestVersion: 1.1
 id: mrfyda-karaoke-eternal
 category: media
 name: Karaoke Eternal
-version: "2.0.2b"
+version: "2.0.2c"
 tagline: Host karaoke parties where everyone queues songs from their phone
 icon: https://raw.githubusercontent.com/mrfyda/umbrel-app-store/main/mrfyda-karaoke-eternal/icon.svg
 port: 8090
@@ -60,8 +60,8 @@ repo: https://github.com/bhj/KaraokeEternal
 support: https://github.com/bhj/KaraokeEternal/issues
 gallery: []
 releaseNotes: >-
-  2.0.2b adds no upstream code. The letter marks packaging-only changes made in
-  this store; upstream is still 2.0.2.
+  2.0.2c is packaging-only. It updates the icon URL to the committed SVG so
+  Umbrel no longer requests the deleted PNG. Upstream is still 2.0.2.
 
 
   2.0.2a turned Lazytainer's open-connection check back on, and that turns out
