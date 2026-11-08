@@ -2,7 +2,7 @@ manifestVersion: 1.1
 id: mrfyda-maki
 category: media
 name: Maki
-version: "0.35.0"
+version: "0.35.0a"
 tagline: Track manga series and collect chapters
 icon: https://raw.githubusercontent.com/mrfyda/umbrel-app-store/main/mrfyda-maki/icon.svg
 port: 8990
@@ -12,10 +12,12 @@ description: >-
   supports direct chapter sources and reading progress sync.
 
 
-  Settings and manga files are stored under this app's data directory on the
-  Umbrel host. Set Maki's library folder to /media/manga. For Prowlarr torrent
-  downloads, configure your download client to save under /media/downloads and
-  mount the same host media folder into both apps at /media.
+  Setup: in Maki, set the library folder to /downloads/manga. Under Settings →
+  Downloads, connect Transmission at http://transmission_server_1:9091 and Prowlarr at
+  http://prowlarr_server_1:9696 using Prowlarr's API key. Under Settings →
+  FlareSolverr, use http://prowlarr_indexer_proxy_1:8191. These service names
+  connect to the matching Umbrel apps; Prowlarr includes the FlareSolverr
+  service. Maki's settings and database are stored under this app's data folder.
 developer: OrbitMPGH
 website: https://orbitmpgh.github.io/Maki/
 submitter: mrfyda
@@ -24,9 +26,14 @@ repo: https://github.com/OrbitMPGH/Maki
 support: https://github.com/OrbitMPGH/Maki/issues
 gallery: []
 releaseNotes: >-
-  Package Maki v0.35.0 for Umbrel. This release adds source definitions,
-  chapter library improvements, and download client updates.
-dependencies: []
+  Packaging update for Maki v0.35.0. Connects Transmission and Prowlarr through
+  umbrelOS, shares Umbrel's Downloads storage, and documents the FlareSolverr
+  endpoint provided by Prowlarr.
+dependencies:
+  - transmission
+  - prowlarr
 path: ""
 defaultUsername: ""
 defaultPassword: ""
+permissions:
+  - STORAGE_DOWNLOADS
