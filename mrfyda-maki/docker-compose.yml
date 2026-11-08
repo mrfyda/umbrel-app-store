@@ -1,0 +1,17 @@
+version: "3.7"
+
+services:
+  app_proxy:
+    environment:
+      APP_HOST: mrfyda-maki_app_1
+      APP_PORT: 8990
+
+  app:
+    image: ghcr.io/orbitmpgh/maki:latest@sha256:a1107dd424cd6a1e0eb13711a214e4cb9d6d042b9a106bb2749891541ff144fa
+    restart: unless-stopped
+    volumes:
+      - ${APP_DATA_DIR}/data/config:/config
+      - ${APP_DATA_DIR}/data/media:/media
+    environment:
+      PUID: "1000"
+      PGID: "1000"

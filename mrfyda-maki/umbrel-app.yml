@@ -1,0 +1,32 @@
+manifestVersion: 1.1
+id: mrfyda-maki
+category: media
+name: Maki
+version: "0.35.0"
+tagline: Track manga series and collect chapters
+icon: https://raw.githubusercontent.com/mrfyda/umbrel-app-store/main/mrfyda-maki/icon.svg
+port: 8990
+description: >-
+  Monitor manga series chapter by chapter, search for releases through Prowlarr,
+  and organize downloads as CBZ files for Maki or another reader. Maki also
+  supports direct chapter sources and reading progress sync.
+
+
+  Settings and manga files are stored under this app's data directory on the
+  Umbrel host. Set Maki's library folder to /media/manga. For Prowlarr torrent
+  downloads, configure your download client to save under /media/downloads and
+  mount the same host media folder into both apps at /media.
+developer: OrbitMPGH
+website: https://orbitmpgh.github.io/Maki/
+submitter: mrfyda
+submission: https://github.com/mrfyda/umbrel-app-store
+repo: https://github.com/OrbitMPGH/Maki
+support: https://github.com/OrbitMPGH/Maki/issues
+gallery: []
+releaseNotes: >-
+  Package Maki v0.35.0 for Umbrel. This release adds source definitions,
+  chapter library improvements, and download client updates.
+dependencies: []
+path: ""
+defaultUsername: ""
+defaultPassword: ""
