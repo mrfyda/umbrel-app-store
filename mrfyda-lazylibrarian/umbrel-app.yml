@@ -1,0 +1,31 @@
+manifestVersion: 1.1
+id: mrfyda-lazylibrarian
+category: media
+name: LazyLibrarian
+version: "8b6ba443"
+tagline: Follow authors and manage your ebook and audiobook library
+icon: https://raw.githubusercontent.com/mrfyda/umbrel-app-store/main/mrfyda-lazylibrarian/icon.svg
+port: 5299
+description: >-
+  Follow authors, find new releases, and organize ebooks and audiobooks in your
+  library. LazyLibrarian can send downloads to your download client and import
+  finished books into your library.
+
+
+  The app stores its settings in its own configuration folder. Downloads and
+  books are available at /downloads and /books inside LazyLibrarian; both map
+  to folders under this app's data directory on the Umbrel host.
+developer: LazyLibrarian
+website: https://lazylibrarian.gitlab.io/
+submitter: mrfyda
+submission: https://github.com/mrfyda/umbrel-app-store
+repo: https://github.com/linuxserver/docker-lazylibrarian
+support: https://github.com/linuxserver/docker-lazylibrarian/issues
+gallery: []
+releaseNotes: >-
+  Initial packaging of LazyLibrarian using the LinuxServer multi-architecture
+  image. Upstream image build: 8b6ba443-ls392.
+dependencies: []
+path: ""
+defaultUsername: ""
+defaultPassword: ""

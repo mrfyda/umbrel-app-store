@@ -21,6 +21,8 @@ repository's URL.
   ([source](https://github.com/gesellix/go-trmnl))
 - **Minecraft** — a Fabric Minecraft server behind Lazymc.
   ([source](https://github.com/itzg/docker-minecraft-server))
+- **LazyLibrarian** — follow authors and manage ebook and audiobook downloads.
+  ([source](https://github.com/linuxserver/docker-lazylibrarian))
 
 ## A note on sleeping apps
 
